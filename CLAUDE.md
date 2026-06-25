@@ -61,13 +61,33 @@ cargo tw                # whole workspace — the final Definition-of-Done sweep
 
 cargo td decode_one     # filter: any nextest args append to an alias
 
+cargo kc                # clippy newtua-common  \  check-only: type-check,
+cargo kd                # clippy newtua-dos      | NO codegen or linking
+cargo ka                # clippy newtua-amiga   /
+
 cargo build --workspace
 cargo clippy --workspace --all-targets   # must be warning-free
 cargo fmt --all --check
 ```
 
-While building a format, run its own alias (e.g. `cargo td`); run `cargo tw`
+While building a format, run its own test alias (e.g. `cargo td`); run `cargo tw`
 only for step 4 of the Definition of Done.
+
+### Keep the inner loop fast (compilation, not just tests)
+
+The crates have **no external dependencies**, so dependency compilation is free
+and the cost of each rebuild is dominated by **linking the test binary** (and,
+on macOS, `dsymutil`). Two rules keep that cost down:
+
+- **`cargo k*` while chasing compile errors.** When you are only fixing things
+  that don't compile yet — not ready to *run* a test — use the check-only alias
+  (`cargo kd`, etc.). It type-checks and skips codegen + linking, finishing far
+  faster than building a test binary. Switch to `cargo td` only when you actually
+  need to watch a test go red/green.
+- **Link settings are already tuned** in `[profile.dev]` (`Cargo.toml`):
+  `debug = "line-tables-only"` (keep line numbers in panics, drop the rest) and
+  `split-debuginfo = "unpacked"` (skip the macOS `dsymutil` step on every link).
+  Don't add a debugger-grade `debug = 2` or a packed dSYM to the dev profile.
 
 ## Definition of Done (per roadmap item — ALWAYS follow)
 
