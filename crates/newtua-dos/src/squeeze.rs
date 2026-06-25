@@ -1,6 +1,6 @@
 //! Squeeze (`.SQ`) — CP/M-era single-file Huffman compressor.
 //!
-//! File layout (ported from XADMaster's `XADSqueezeParser` / `XADSqueezeHandle`):
+//! File layout:
 //! `0x76 0xFF`, a u16 LE checksum, a NUL-terminated original filename, then the
 //! Huffman-compressed stream: a u16 LE node count followed by `count * 2` i16 LE
 //! values (two child links per node). A child `< 0` is a leaf with value
@@ -9,9 +9,9 @@
 
 use std::io::{self, Read};
 
-use xad_common::bitreader::BitReaderLsb;
-use xad_common::bytes::{read_u16_le, read_u8};
-use xad_common::rle90::Rle90Reader;
+use newtua_common::bitreader::BitReaderLsb;
+use newtua_common::bytes::{read_u16_le, read_u8};
+use newtua_common::rle90::Rle90Reader;
 
 const EOF_SYMBOL: u16 = 256;
 const MAX_NODES: usize = 257;

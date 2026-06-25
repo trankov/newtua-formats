@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`xad-rs` — pure-Rust decoders for **legacy archive formats that have no mature
+`newtua-formats` — pure-Rust decoders for **legacy archive formats that have no mature
 Rust crate yet**, ported from The Unarchiver's **XADMaster** engine (LGPL-2.1).
 Built to plug into the `newtua` extractor (`../newtheunarchiver`), but each crate
 is usable standalone by the wider community.
@@ -21,11 +21,11 @@ is usable standalone by the wider community.
 
 ## Architecture
 
-- `crates/xad-common` — shared primitives reused by every family crate: bit
+- `crates/newtua-common` — shared primitives reused by every family crate: bit
   readers, prefix/Huffman codes, LZSS sliding window, range coder, CRC, RLE90.
   Grown **test-first**, one primitive at a time, as formats need them.
-- `crates/xad-dos` (and future `xad-mac`, `xad-stuffit`, `xad-amiga`, `xad-alz`,
-  `xad-nsis`) — one crate per **family**; each format inside is a container parser
+- `crates/newtua-dos` (and future `newtua-mac`, `newtua-stuffit`, `newtua-amiga`, `newtua-alz`,
+  `newtua-nsis`) — one crate per **family**; each format inside is a container parser
   + its compression methods.
 - Each crate exposes a **newtua-agnostic** API (its own `Entry`/`Error` types,
   raw filename bytes — never decode charsets here; newtua does that centrally).
@@ -39,7 +39,7 @@ XADMaster source to port from: `../unarch39/The Unarchiver/XADMaster/`.
 
 ## Scope boundary (do not cross)
 
-Work happens **only in this repo (`xad-rs`)**, plus read-only analysis under
+Work happens **only in this repo (`newtua-formats`)**, plus read-only analysis under
 `../unarch39`. **Do NOT modify anything in `../newtheunarchiver` (newtua) except
 the formats table `docs/legacy-formats-roadmap.md`** — its `CLAUDE.md`, source,
 and handlers are owned by the newtua maintainers. Writing the newtua-side
@@ -55,7 +55,7 @@ cargo test  --workspace                  # must be green before done
 cargo clippy --workspace --all-targets   # must be warning-free
 cargo fmt --all --check
 
-cargo test -p xad-common rle90           # single module
+cargo test -p newtua-common rle90           # single module
 ```
 
 ## Definition of Done (per roadmap item — ALWAYS follow)

@@ -1,7 +1,7 @@
 [package]
-name = "xad-amiga"
+name = "newtua-dos"
 version = "0.0.0"
-description = "Decoders for Amiga compression formats (PowerPacker, Amiga LZX, DMS), ported from The Unarchiver's XADMaster."
+description = "Decoders for DOS/CP-M era archive formats: Squeeze, ARC, LBR, Crunch, Zoo, ARJ."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -10,3 +10,4 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
+newtua-common.workspace = true

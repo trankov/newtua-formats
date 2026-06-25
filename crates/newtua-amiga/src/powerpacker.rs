@@ -1,6 +1,6 @@
 //! PowerPacker (`PP20`) decruncher.
 //!
-//! Ported from XADMaster's `XADPowerPackerParser`. The file is
+//! The file is
 //! `"PP20"`, a 4-byte offset-width table, the crunched bitstream, and a trailing
 //! longword: 3 bytes of decrunched length plus 1 byte giving how many alignment
 //! bits to discard at the start. The bitstream is read **MSB-first from the end

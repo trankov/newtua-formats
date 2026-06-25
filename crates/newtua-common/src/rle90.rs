@@ -2,7 +2,6 @@
 //!
 //! The `0x90` byte is a repeat marker: `b 0x90 n` expands to `b` repeated `n`
 //! times total. `0x90 0x00` is a literal `0x90`. A count of `1` is invalid.
-//! Ported from XADMaster's `XADRLE90Handle`.
 
 use std::io::{self, Read};
 
@@ -130,7 +129,7 @@ mod tests {
     fn run_at_start_repeats_initial_zero() {
         // No preceding literal, so the run emits count-1 copies of the default
         // repeated byte (0x00) — the marker's implied "first copy" is the
-        // absent literal. Matches XADMaster's XADRLE90Handle.
+        // absent literal.
         assert_eq!(decode(&[0x90, 0x03]).unwrap(), vec![0x00; 2]);
     }
 }

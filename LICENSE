@@ -1,4 +1,4 @@
-xad-rs — pure-Rust decoders for legacy archive formats.
+newtua-formats — pure-Rust decoders for legacy archive formats.
 Copyright (C) 2026 Aleksei Trankov and contributors.
 
 This program is free software; you can redistribute it and/or modify it under

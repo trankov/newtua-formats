@@ -7,7 +7,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-use xad_dos::squeeze::SqueezeFile;
+use newtua_dos::squeeze::SqueezeFile;
 
 // A valid `.SQ` (verified accepted by `unar`): inner file "a", content "A".
 const SQ_A: &[u8] = &[
@@ -26,7 +26,7 @@ fn unar_installed() -> bool {
 }
 
 fn workdir() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("xad_sq_oracle_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("newtua_sq_oracle_{}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     dir
 }

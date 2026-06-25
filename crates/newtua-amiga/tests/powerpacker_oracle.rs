@@ -9,7 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use xad_amiga::powerpacker::PowerPackerFile;
+use newtua_amiga::powerpacker::PowerPackerFile;
 
 const CASES: &[(&str, &[u8])] = &[("hello.pp", b"Hello, PowerPacker!"), ("six.pp", b"AAAAAA")];
 
@@ -42,7 +42,7 @@ fn our_decode_matches_unar() {
         assert_eq!(ours, *expected, "our decode wrong for {file}");
 
         let dir: PathBuf = std::env::temp_dir().join(format!(
-            "xad_pp_oracle_{}_{}",
+            "newtua_pp_oracle_{}_{}",
             std::process::id(),
             file.replace('.', "_")
         ));

@@ -1,12 +1,8 @@
-# xad-rs
+# newtua-formats
 
-Pure-Rust decoders for legacy archive formats that have no mature Rust crate yet
-— ported from [The Unarchiver](https://theunarchiver.com/)'s **XADMaster**
-engine (LGPL-2.1). Built to plug into the [`newtua`](../newtheunarchiver) archive
-extractor, but usable standalone.
-
-> Working name. The crate/repo names may change before the first crates.io
-> publish.
+Pure-Rust decoders for legacy archive formats that have no mature Rust crate yet.
+Built to plug into the [`newtua`](../newtheunarchiver) archive extractor, but each
+crate is usable standalone.
 
 ## Scope
 
@@ -23,13 +19,13 @@ cross-checking correctness.
 
 | Crate | Formats |
 |-------|---------|
-| `xad-common` | shared primitives: bit readers, Huffman/prefix codes, LZSS window, RLE90, CRC |
-| `xad-dos` | Squeeze, ARC, LBR, Crunch, Zoo, ARJ |
-| `xad-mac` *(planned)* | BinHex, MacBinary/AppleSingle/AppleDouble, Compact Pro, PackIt, DiskDoubler, NowCompress |
-| `xad-stuffit` *(planned)* | StuffIt classic, StuffIt 5, StuffItX |
-| `xad-amiga` *(planned)* | PowerPacker, Amiga LZX, DMS, libxad bridge |
-| `xad-alz` *(planned)* | ALZip |
-| `xad-nsis` *(planned)* | NSIS |
+| `newtua-common` | shared primitives: bit readers, Huffman/prefix codes, LZSS window, RLE90, CRC |
+| `newtua-dos` | Squeeze, ARC, LBR, Crunch, Zoo, ARJ |
+| `newtua-mac` *(planned)* | BinHex, MacBinary/AppleSingle/AppleDouble, Compact Pro, PackIt, DiskDoubler, NowCompress |
+| `newtua-stuffit` *(planned)* | StuffIt classic, StuffIt 5, StuffItX |
+| `newtua-amiga` | PowerPacker (Amiga LZX, DMS planned) |
+| `newtua-alz` *(planned)* | ALZip |
+| `newtua-nsis` *(planned)* | NSIS |
 
 Implementation order and status are tracked in
 [`newtheunarchiver/docs/legacy-formats-roadmap.md`](../newtheunarchiver/docs/legacy-formats-roadmap.md).

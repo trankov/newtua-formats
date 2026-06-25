@@ -1,8 +1,7 @@
 //! LSB-first bit reader.
 //!
-//! Bits are consumed from the least-significant end of each byte first, matching
-//! XADMaster's `CSInputNextBitLE` / `...UsingCodeLE`. Used by formats whose
-//! bit-packed data is little-endian (e.g. Squeeze).
+//! Bits are consumed from the least-significant end of each byte first. Used by
+//! formats whose bit-packed data is little-endian (e.g. Squeeze).
 
 use std::io::{self, Read};
 
