@@ -1,8 +1,9 @@
-//! End-to-end golden test: extract a multi-member `.arc` with our crate AND with
-//! the reference `unar`, and assert every member agrees byte-for-byte.
+//! End-to-end golden tests: extract a multi-member `.arc` with our crate AND
+//! with the reference `unar`, and assert every member agrees byte-for-byte.
 //!
-//! The fixture (verified against `unar`) holds a stored, a packed (RLE90), and a
-//! squeezed member. Skipped when `unar` is not installed.
+//! `multi.arc` holds a stored, a packed (RLE90) and a squeezed member;
+//! `lzw.arc` holds a Squashed (method 9) and a Crunched-LZW (method 8) member.
+//! Both fixtures were verified against `unar`. Skipped when `unar` is absent.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -18,27 +19,53 @@ fn fixture(name: &str) -> Vec<u8> {
     fs::read(path).unwrap()
 }
 
-#[test]
-fn our_decode_matches_unar() {
-    if !unar_installed() {
-        eprintln!("skipping: `unar` not installed");
-        return;
-    }
-
-    let data = fixture("multi.arc");
-    let arc = ArcArchive::open(&data[..]).unwrap();
-
-    let mut ours = BTreeMap::new();
+/// Decode every non-directory member of `data` with our crate.
+fn ours(data: &[u8]) -> BTreeMap<String, Vec<u8>> {
+    let arc = ArcArchive::open(data).unwrap();
+    let mut map = BTreeMap::new();
     for (i, entry) in arc.entries().iter().enumerate() {
         if entry.is_dir() {
             continue;
         }
         let mut out = Vec::new();
         arc.read_entry(i, &mut out).unwrap();
-        let name = String::from_utf8(entry.name().to_vec()).unwrap();
-        ours.insert(name, out);
+        map.insert(String::from_utf8(entry.name().to_vec()).unwrap(), out);
     }
+    map
+}
 
-    let theirs = unar_extract_all(&data, "multi.arc");
-    assert_eq!(ours, theirs, "our extraction disagrees with unar");
+fn assert_matches_unar(name: &str) {
+    if !unar_installed() {
+        eprintln!("skipping: `unar` not installed");
+        return;
+    }
+    let data = fixture(name);
+    assert_eq!(
+        ours(&data),
+        unar_extract_all(&data, name),
+        "our extraction of {name} disagrees with unar"
+    );
+}
+
+#[test]
+fn stored_packed_squeezed_match_unar() {
+    assert_matches_unar("multi.arc");
+}
+
+#[test]
+fn squashed_and_crunched_lzw_match_unar() {
+    assert_matches_unar("lzw.arc");
+}
+
+#[test]
+fn compressed_method_matches_unar() {
+    assert_matches_unar("cmp.arc");
+}
+
+/// `clear.arc` is a method-0x7f member at maxbits 9 whose ~800-byte payload
+/// fills the table twice, forcing two block-mode clear codes (and their
+/// group-of-8 padding) — the one compress path the smaller fixtures never hit.
+#[test]
+fn block_mode_clear_matches_unar() {
+    assert_matches_unar("clear.arc");
 }

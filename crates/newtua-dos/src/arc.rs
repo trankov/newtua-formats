@@ -6,11 +6,13 @@
 //! subdirectory and `0x1F`/`0x80` close one.
 //!
 //! Supported methods so far: 1/2 stored, 3 packed (RLE90), 4 squeezed
-//! (Huffman + RLE90). Crunch/squash/crush/distill (LZW-based) return
-//! `Unsupported` pending their codecs.
+//! (Huffman + RLE90), 8 crunched-LZW (compress + RLE90), 9 squashed (compress),
+//! 0x7f compressed (compress). Crunch (5/6/7), crushed (0xa) and distilled
+//! (0xb) return `Unsupported` pending their codecs.
 
 use std::io::{self, Read, Write};
 
+use newtua_common::compress::CompressReader;
 use newtua_common::crc16::crc16_arc;
 use newtua_common::rle90::Rle90Reader;
 
@@ -227,6 +229,26 @@ fn decode_method(method: u8, comp: &[u8], uncompressed_size: usize) -> io::Resul
             let huffman = SqueezeReader::new(comp)?;
             read_n(Rle90Reader::new(huffman), uncompressed_size)
         }
+        // Crunched (LZW): a leading 0x0c byte, then 12-bit compress, then RLE90.
+        8 => {
+            let body = comp
+                .split_first()
+                .filter(|(&b, _)| b == 0x0c)
+                .map(|(_, rest)| rest)
+                .ok_or_else(|| invalid("arc: bad crunched-LZW header byte"))?;
+            let lzw = CompressReader::new(body, 12, true);
+            read_n(Rle90Reader::new(lzw), uncompressed_size)
+        }
+        // Squashed: 13-bit compress, no RLE90.
+        9 => read_n(CompressReader::new(comp, 13, true), uncompressed_size),
+        // Compressed: a leading flags byte gives the max code width.
+        0x7f => {
+            let (&flags, body) = comp
+                .split_first()
+                .ok_or_else(|| invalid("arc: missing compress flags byte"))?;
+            let lzw = CompressReader::new(body, flags & 0x1f, true);
+            read_n(lzw, uncompressed_size)
+        }
         other => Err(io::Error::new(
             io::ErrorKind::Unsupported,
             format!("arc: unsupported method {other}"),
@@ -343,9 +365,51 @@ mod tests {
     }
 
     #[test]
+    fn decodes_squashed() {
+        // Method 9: Unix compress (maxbits 13, block mode), no RLE90 layer.
+        let content = b"squash squash squash squash!";
+        let stream = hex(b"73e2d40933070d8880030b1e1448d020c2862100");
+        let a = archive(&[member(0x09, b"s", &stream, content)]);
+        let arc = ArcArchive::open(&a[..]).unwrap();
+        assert_eq!(read(&arc, 0).unwrap(), content);
+    }
+
+    #[test]
+    fn decodes_crunched_lzw() {
+        // Method 8: a leading 0x0c, then compress (maxbits 12), then RLE90.
+        let content = b"crunch lzw crunch lzw crunch";
+        let stream = hex(b"0c63e4d47133060d08367aee800838b0e0c1840b05124403");
+        let a = archive(&[member(0x08, b"c", &stream, content)]);
+        let arc = ArcArchive::open(&a[..]).unwrap();
+        assert_eq!(read(&arc, 0).unwrap(), content);
+    }
+
+    #[test]
+    fn decodes_compressed_7f() {
+        // Method 0x7f: a leading flags byte (0x0c → 12-bit), then compress.
+        let content = b"compressed method 7f: foofoofoo barbarbar foofoofoo";
+        let stream = hex(b"0c63deb48123a7cc9c3965c8806853860e9a370a6f98d101c2cc9b3716315e0421268c9c8e1f3d56bc983123");
+        let a = archive(&[member(0x7f, b"cmp", &stream, content)]);
+        let arc = ArcArchive::open(&a[..]).unwrap();
+        assert_eq!(read(&arc, 0).unwrap(), content);
+    }
+
+    #[test]
     fn unsupported_method_errors() {
-        let a = archive(&[member(0x08, b"c", b"\x0c....", b"....")]);
+        let a = archive(&[member(0x0b, b"c", b"....", b"....")]);
         let arc = ArcArchive::open(&a[..]).unwrap();
         assert!(read(&arc, 0).is_err());
+    }
+
+    /// Decode an ASCII-hex string into bytes (test helper).
+    fn hex(s: &[u8]) -> Vec<u8> {
+        fn nib(c: u8) -> u8 {
+            match c {
+                b'0'..=b'9' => c - b'0',
+                b'a'..=b'f' => c - b'a' + 10,
+                _ => panic!("bad hex"),
+            }
+        }
+        s.chunks(2).map(|p| nib(p[0]) << 4 | nib(p[1])).collect()
     }
 }

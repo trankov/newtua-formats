@@ -13,6 +13,7 @@ use std::io::{self, Read};
 
 pub mod bitreader;
 pub mod bytes;
+pub mod compress;
 pub mod crc16;
 pub mod rle90;
 
