@@ -5,6 +5,7 @@ resolver = "2"
 members = [
     "crates/xad-common",
     "crates/xad-dos",
+    "crates/xad-amiga",
 ]
 
 [workspace.package]
