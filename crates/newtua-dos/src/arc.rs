@@ -8,8 +8,7 @@
 //! Supported methods so far: 1/2 stored, 3 packed (RLE90), 4 squeezed
 //! (Huffman + RLE90), 5/6/7 crunched (hash LZW, ±RLE90), 8 crunched-LZW
 //! (compress + RLE90), 9 squashed (compress), 0xa crushed (adaptive LZW +
-//! RLE90), 0x7f compressed (compress). Distilled (0xb) returns `Unsupported`
-//! pending its codec.
+//! RLE90), 0xb distilled (LZSS + Huffman), 0x7f compressed (compress).
 
 use std::io::{self, Read, Write};
 
@@ -19,6 +18,7 @@ use newtua_common::rle90::Rle90Reader;
 
 use crate::crunch::{CrunchHash, CrunchReader};
 use crate::crush::CrushReader;
+use crate::distill::decode as decode_distill;
 use crate::squeeze::SqueezeReader;
 
 fn invalid(msg: impl Into<String>) -> io::Error {
@@ -261,6 +261,10 @@ fn decode_method(method: u8, comp: &[u8], uncompressed_size: usize) -> io::Resul
         9 => read_n(CompressReader::new(comp, 13, true), uncompressed_size),
         // Crushed: adaptive LZW, then RLE90.
         0x0a => read_n(Rle90Reader::new(CrushReader::new(comp)), uncompressed_size),
+        // Distilled: LZSS with a header-supplied Huffman code, no RLE90.
+        // `decode` is authoritative on length, so it returns the bytes directly
+        // (like the stored methods) rather than going through `read_n`.
+        0x0b => decode_distill(comp),
         // Compressed: a leading flags byte gives the max code width.
         0x7f => {
             let (&flags, body) = comp
@@ -417,7 +421,8 @@ mod tests {
 
     #[test]
     fn unsupported_method_errors() {
-        let a = archive(&[member(0x0b, b"c", b"....", b"....")]);
+        // 0x0c is not a real ARC method; it must surface as an error.
+        let a = archive(&[member(0x0c, b"c", b"....", b"....")]);
         let arc = ArcArchive::open(&a[..]).unwrap();
         assert!(read(&arc, 0).is_err());
     }
