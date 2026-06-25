@@ -6,6 +6,7 @@ members = [
     "crates/newtua-common",
     "crates/newtua-dos",
     "crates/newtua-amiga",
+    "crates/newtua-alz",
     "crates/newtua-testutil",
 ]
 

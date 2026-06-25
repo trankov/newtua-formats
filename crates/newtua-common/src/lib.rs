@@ -15,6 +15,7 @@ pub mod bitreader;
 pub mod bytes;
 pub mod compress;
 pub mod crc16;
+pub mod crc32;
 pub mod lzss;
 pub mod prefixcode;
 pub mod rle90;

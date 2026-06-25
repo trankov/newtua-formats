@@ -5,6 +5,7 @@
 #   cargo tc   → newtua-common
 #   cargo td   → newtua-dos
 #   cargo ta   → newtua-amiga
+#   cargo tz   → newtua-alz
 #   cargo tu   → newtua-testutil
 #   cargo tw   → whole workspace (the final Definition-of-Done sweep)
 #
@@ -15,13 +16,15 @@
 # they finish far faster than building a test binary. Switch to `cargo td` only
 # when you actually need to observe a test go red/green.
 #
-#   cargo kc / kd / ka   → clippy on common / dos / amiga (compile check only)
+#   cargo kc / kd / ka / kz → clippy on common / dos / amiga / alz (compile check only)
 [alias]
 tc = "nextest run -p newtua-common"
 td = "nextest run -p newtua-dos"
 ta = "nextest run -p newtua-amiga"
+tz = "nextest run -p newtua-alz"
 tu = "nextest run -p newtua-testutil"
 tw = "nextest run --workspace"
 kc = "clippy -p newtua-common --all-targets"
 kd = "clippy -p newtua-dos --all-targets"
 ka = "clippy -p newtua-amiga --all-targets"
+kz = "clippy -p newtua-alz --all-targets"
