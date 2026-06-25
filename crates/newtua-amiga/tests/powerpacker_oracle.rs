@@ -6,20 +6,12 @@
 //! back-reference. Skipped when `unar` is not installed.
 
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::Path;
 
 use newtua_amiga::powerpacker::PowerPackerFile;
+use newtua_testutil::{unar_extract_one, unar_installed};
 
 const CASES: &[(&str, &[u8])] = &[("hello.pp", b"Hello, PowerPacker!"), ("six.pp", b"AAAAAA")];
-
-fn unar_installed() -> bool {
-    Command::new("unar")
-        .arg("-version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 fn fixture(name: &str) -> Vec<u8> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -41,28 +33,7 @@ fn our_decode_matches_unar() {
         let ours = PowerPackerFile::open(&data).unwrap().decode().unwrap();
         assert_eq!(ours, *expected, "our decode wrong for {file}");
 
-        let dir: PathBuf = std::env::temp_dir().join(format!(
-            "newtua_pp_oracle_{}_{}",
-            std::process::id(),
-            file.replace('.', "_")
-        ));
-        fs::create_dir_all(&dir).unwrap();
-        let archive = dir.join(file);
-        fs::write(&archive, &data).unwrap();
-
-        let status = Command::new("unar")
-            .args(["-quiet", "-force-overwrite", "-output-directory"])
-            .arg(&dir)
-            .arg(&archive)
-            .status()
-            .expect("run unar");
-        assert!(status.success(), "unar failed for {file}");
-
-        // unar names the output after the source minus its extension.
-        let stem = Path::new(file).file_stem().unwrap();
-        let unar_out = fs::read(dir.join(stem)).expect("unar output");
-
-        assert_eq!(ours, unar_out, "our decode disagrees with unar for {file}");
-        let _ = fs::remove_dir_all(&dir);
+        let theirs = unar_extract_one(&data, file);
+        assert_eq!(ours, theirs, "our decode disagrees with unar for {file}");
     }
 }

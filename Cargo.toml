@@ -6,6 +6,7 @@ members = [
     "crates/newtua-common",
     "crates/newtua-dos",
     "crates/newtua-amiga",
+    "crates/newtua-testutil",
 ]
 
 [workspace.package]
@@ -18,3 +19,4 @@ keywords = ["archive", "decompression", "retro", "legacy"]
 
 [workspace.dependencies]
 newtua-common = { path = "crates/newtua-common", version = "0.0.0" }
+newtua-testutil = { path = "crates/newtua-testutil" }

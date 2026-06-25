@@ -11,3 +11,6 @@ keywords.workspace = true
 
 [dependencies]
 newtua-common.workspace = true
+
+[dev-dependencies]
+newtua-testutil.workspace = true
