@@ -49,14 +49,25 @@ editing newtua, stop and flag it.
 
 ## Commands
 
+Tests run through **cargo-nextest**. Per-package aliases (in `.cargo/config.toml`)
+scope the TDD loop to just the crate under work — no whole-workspace rebuild:
+
 ```bash
+cargo tc                # newtua-common only      \
+cargo td                # newtua-dos only          | nextest, one package
+cargo ta                # newtua-amiga only        |
+cargo tu                # newtua-testutil only    /
+cargo tw                # whole workspace — the final Definition-of-Done sweep
+
+cargo td decode_one     # filter: any nextest args append to an alias
+
 cargo build --workspace
-cargo test  --workspace                  # must be green before done
 cargo clippy --workspace --all-targets   # must be warning-free
 cargo fmt --all --check
-
-cargo test -p newtua-common rle90           # single module
 ```
+
+While building a format, run its own alias (e.g. `cargo td`); run `cargo tw`
+only for step 4 of the Definition of Done.
 
 ## Definition of Done (per roadmap item — ALWAYS follow)
 
@@ -71,7 +82,7 @@ Each format/primitive is **not done** until every step below is complete:
    through the crate's own public API, with **golden tests** comparing output
    byte-for-byte against the `unar` oracle (and `compcol` where it covers the
    format). (newtua-side handler wiring is out of scope — see Scope boundary.)
-4. **Run the whole suite and fix** — `cargo test --workspace` fully green,
+4. **Run the whole suite and fix** — `cargo tw` (whole workspace) fully green,
    `clippy`/`fmt` clean. Fix the code, not the tests.
 5. **`/simplify`** — run the `simplify` skill on the just-written code and apply
    its cleanups (reuse, simplification, efficiency, altitude), keeping all tests

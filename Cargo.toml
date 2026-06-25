@@ -20,3 +20,9 @@ keywords = ["archive", "decompression", "retro", "legacy"]
 [workspace.dependencies]
 newtua-common = { path = "crates/newtua-common", version = "0.0.0" }
 newtua-testutil = { path = "crates/newtua-testutil" }
+
+# Keep line tables (so panics and test failures still point at a source line)
+# but drop full debug info — faster builds and a smaller target/ during the
+# tight TDD loop, where we never run a debugger anyway.
+[profile.dev]
+debug = "line-tables-only"
