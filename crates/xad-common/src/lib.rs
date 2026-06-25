@@ -10,4 +10,23 @@
 
 #![forbid(unsafe_code)]
 
+use std::io::{self, Read};
+
+pub mod bitreader;
 pub mod rle90;
+
+/// Read one byte from `r`, retrying on `Interrupted`; `None` at end of input.
+///
+/// Shared by the byte-at-a-time decoders ([`rle90`], [`bitreader`]) so the
+/// read/EOF/retry handling lives in one place.
+pub(crate) fn read_one_byte<R: Read>(r: &mut R) -> io::Result<Option<u8>> {
+    let mut b = [0u8; 1];
+    loop {
+        match r.read(&mut b) {
+            Ok(0) => return Ok(None),
+            Ok(_) => return Ok(Some(b[0])),
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        }
+    }
+}

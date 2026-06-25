@@ -41,19 +41,6 @@ impl<R: Read> Read for Rle90Reader<R> {
 }
 
 impl<R: Read> Rle90Reader<R> {
-    /// Read the next raw byte from the inner reader, retrying on `Interrupted`.
-    fn next_input_byte(&mut self) -> io::Result<Option<u8>> {
-        let mut b = [0u8; 1];
-        loop {
-            match self.inner.read(&mut b) {
-                Ok(0) => return Ok(None),
-                Ok(_) => return Ok(Some(b[0])),
-                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
-                Err(e) => return Err(e),
-            }
-        }
-    }
-
     /// Produce the next decoded byte, or `None` at end of stream.
     fn produce_byte(&mut self) -> io::Result<Option<u8>> {
         if self.count > 0 {
@@ -61,7 +48,7 @@ impl<R: Read> Rle90Reader<R> {
             return Ok(Some(self.repeated));
         }
 
-        let b = match self.next_input_byte()? {
+        let b = match crate::read_one_byte(&mut self.inner)? {
             Some(b) => b,
             None => return Ok(None),
         };
@@ -72,7 +59,7 @@ impl<R: Read> Rle90Reader<R> {
         }
 
         // 0x90 is the repeat marker; the next byte is the count.
-        let count = self.next_input_byte()?.ok_or_else(|| {
+        let count = crate::read_one_byte(&mut self.inner)?.ok_or_else(|| {
             io::Error::new(io::ErrorKind::InvalidData, "truncated RLE90 repeat marker")
         })?;
 
