@@ -1,0 +1,13 @@
+[package]
+name = "xad-dos"
+version = "0.0.0"
+description = "Decoders for DOS/CP-M era archive formats (Squeeze, ARC, LBR, Crunch, Zoo, ARJ), ported from The Unarchiver's XADMaster."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[dependencies]
+xad-common.workspace = true

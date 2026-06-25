@@ -1,0 +1,19 @@
+# Workspace for the xad-rs family of legacy archive-format decoders.
+# Pure-Rust ports of decoders from The Unarchiver's XADMaster (LGPL-2.1).
+[workspace]
+resolver = "2"
+members = [
+    "crates/xad-common",
+    "crates/xad-dos",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.74"
+license = "LGPL-2.1-or-later"
+repository = "https://github.com/trankov/xad-rs"
+categories = ["compression", "parser-implementations"]
+keywords = ["archive", "decompression", "retro", "xadmaster"]
+
+[workspace.dependencies]
+xad-common = { path = "crates/xad-common", version = "0.0.0" }
