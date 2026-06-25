@@ -7,8 +7,9 @@
 //!
 //! Supported methods so far: 1/2 stored, 3 packed (RLE90), 4 squeezed
 //! (Huffman + RLE90), 5/6/7 crunched (hash LZW, ±RLE90), 8 crunched-LZW
-//! (compress + RLE90), 9 squashed (compress), 0x7f compressed (compress).
-//! Crushed (0xa) and distilled (0xb) return `Unsupported` pending their codecs.
+//! (compress + RLE90), 9 squashed (compress), 0xa crushed (adaptive LZW +
+//! RLE90), 0x7f compressed (compress). Distilled (0xb) returns `Unsupported`
+//! pending its codec.
 
 use std::io::{self, Read, Write};
 
@@ -17,6 +18,7 @@ use newtua_common::crc16::crc16_arc;
 use newtua_common::rle90::Rle90Reader;
 
 use crate::crunch::{CrunchHash, CrunchReader};
+use crate::crush::CrushReader;
 use crate::squeeze::SqueezeReader;
 
 fn invalid(msg: impl Into<String>) -> io::Error {
@@ -257,6 +259,8 @@ fn decode_method(method: u8, comp: &[u8], uncompressed_size: usize) -> io::Resul
         }
         // Squashed: 13-bit compress, no RLE90.
         9 => read_n(CompressReader::new(comp, 13, true), uncompressed_size),
+        // Crushed: adaptive LZW, then RLE90.
+        0x0a => read_n(Rle90Reader::new(CrushReader::new(comp)), uncompressed_size),
         // Compressed: a leading flags byte gives the max code width.
         0x7f => {
             let (&flags, body) = comp

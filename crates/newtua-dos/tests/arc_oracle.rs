@@ -76,3 +76,12 @@ fn crunch_methods_match_unar() {
 fn block_mode_clear_matches_unar() {
     assert_matches_unar("clear.arc");
 }
+
+/// `crush.arc` holds a stored anchor plus four method-0xa (Crushed) members:
+/// short text, a repetitive run, a ~9.5 KB payload that drives the stream into
+/// no-literal-bit mode, and a 12 KB payload that fills the 8192-slot table and
+/// exercises the least-used eviction path.
+#[test]
+fn crush_method_matches_unar() {
+    assert_matches_unar("crush.arc");
+}

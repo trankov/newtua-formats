@@ -44,6 +44,21 @@ impl<R: Read> BitReaderLsb<R> {
         self.nbits -= 1;
         Ok(Some(bit))
     }
+
+    /// Read the next `n`-bit code (`n` ≤ 32), least-significant bit first: the
+    /// first bit read becomes bit 0 of the result. Returns `None` once fewer
+    /// than `n` bits remain (a partial code at end of input is discarded).
+    pub fn read_bits(&mut self, n: u8) -> io::Result<Option<u32>> {
+        let mut acc = 0u32;
+        for i in 0..n {
+            match self.read_bit()? {
+                Some(true) => acc |= 1 << i,
+                Some(false) => {}
+                None => return Ok(None),
+            }
+        }
+        Ok(Some(acc))
+    }
 }
 
 /// Reads fixed- or variable-width codes from an inner byte reader,
@@ -180,6 +195,37 @@ mod tests {
         let mut expect = vec![false; 8];
         expect[0] = true;
         assert_eq!(bits, expect);
+    }
+
+    #[test]
+    fn lsb_read_bits_assembles_low_bit_first() {
+        // 0xB1 = 1011_0001; LSB-first 4 bits = 0b0001 = 1, next 4 = 0b1011 = 0xB.
+        let mut r = BitReaderLsb::new(Cursor::new(vec![0xB1]));
+        assert_eq!(r.read_bits(4).unwrap(), Some(0x1));
+        assert_eq!(r.read_bits(4).unwrap(), Some(0xB));
+        assert_eq!(r.read_bits(4).unwrap(), None);
+    }
+
+    #[test]
+    fn lsb_read_bits_crosses_byte_boundary() {
+        // 0x34 0x12: 12 bits LSB-first → low byte first, then the low nibble of
+        // the next byte as the high bits = 0x234.
+        let mut r = BitReaderLsb::new(Cursor::new(vec![0x34, 0x12]));
+        assert_eq!(r.read_bits(12).unwrap(), Some(0x234));
+        assert_eq!(r.read_bits(4).unwrap(), Some(0x1));
+    }
+
+    #[test]
+    fn lsb_read_bits_zero_width_is_zero() {
+        let mut r = BitReaderLsb::new(Cursor::new(vec![0xFF]));
+        assert_eq!(r.read_bits(0).unwrap(), Some(0));
+    }
+
+    #[test]
+    fn lsb_read_bits_partial_at_eof_is_none() {
+        // Only 8 bits available; asking for 12 must report end of input.
+        let mut r = BitReaderLsb::new(Cursor::new(vec![0xAA]));
+        assert_eq!(r.read_bits(12).unwrap(), None);
     }
 
     #[test]

@@ -11,6 +11,7 @@
 
 pub mod arc;
 pub mod crunch;
+pub mod crush;
 pub mod squeeze;
 
 /// Shared test helpers.
