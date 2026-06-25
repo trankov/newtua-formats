@@ -81,6 +81,45 @@ pub fn unar_extract_all(archive_bytes: &[u8], archive_name: &str) -> BTreeMap<St
     map
 }
 
+/// A least-significant-bit-first bit writer, used by the test-only encoders
+/// that build fixtures for the LSB-first formats (Squeeze, Distill).
+#[derive(Default)]
+pub struct BitWriter {
+    bytes: Vec<u8>,
+    cur: u8,
+    nbits: u8,
+}
+
+impl BitWriter {
+    /// Append a single bit.
+    pub fn bit(&mut self, b: bool) {
+        if b {
+            self.cur |= 1 << self.nbits;
+        }
+        self.nbits += 1;
+        if self.nbits == 8 {
+            self.bytes.push(self.cur);
+            self.cur = 0;
+            self.nbits = 0;
+        }
+    }
+
+    /// Append the low `n` bits of `val`, least-significant bit first.
+    pub fn bits(&mut self, val: u32, n: u32) {
+        for i in 0..n {
+            self.bit((val >> i) & 1 != 0);
+        }
+    }
+
+    /// Flush any partial final byte and return the written bytes.
+    pub fn finish(mut self) -> Vec<u8> {
+        if self.nbits > 0 {
+            self.bytes.push(self.cur);
+        }
+        self.bytes
+    }
+}
+
 fn collect(root: &Path, dir: &Path, archive: &Path, map: &mut BTreeMap<String, Vec<u8>>) {
     for entry in fs::read_dir(dir).unwrap() {
         let path = entry.unwrap().path();

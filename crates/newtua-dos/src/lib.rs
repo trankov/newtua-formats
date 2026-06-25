@@ -13,6 +13,7 @@ pub mod arc;
 pub mod crunch;
 pub mod crush;
 pub mod distill;
+pub mod lbr;
 pub mod squeeze;
 
 /// Shared test helpers.

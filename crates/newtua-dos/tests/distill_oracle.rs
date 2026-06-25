@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use newtua_common::crc16::crc16_arc;
 use newtua_dos::arc::ArcArchive;
-use newtua_testutil::{unar_extract_all, unar_installed};
+use newtua_testutil::{unar_extract_all, unar_installed, BitWriter};
 
 // ---------------------------------------------------------------------------
 // Minimal Distilled encoder (test-only; mirrors XADARCDistillHandle's format).
@@ -56,38 +56,6 @@ enum Tok {
     Lit(u8),
     Match { distance: usize, length: usize },
     End,
-}
-
-#[derive(Default)]
-struct BitWriter {
-    bytes: Vec<u8>,
-    cur: u8,
-    nbits: u8,
-}
-
-impl BitWriter {
-    fn bit(&mut self, b: bool) {
-        if b {
-            self.cur |= 1 << self.nbits;
-        }
-        self.nbits += 1;
-        if self.nbits == 8 {
-            self.bytes.push(self.cur);
-            self.cur = 0;
-            self.nbits = 0;
-        }
-    }
-    fn bits(&mut self, val: u32, n: u32) {
-        for i in 0..n {
-            self.bit((val >> i) & 1 != 0);
-        }
-    }
-    fn finish(mut self) -> Vec<u8> {
-        if self.nbits > 0 {
-            self.bytes.push(self.cur);
-        }
-        self.bytes
-    }
 }
 
 fn count_internal(t: &Tree) -> usize {
