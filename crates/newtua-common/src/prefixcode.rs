@@ -13,7 +13,7 @@
 
 use std::io::{self, Read};
 
-use crate::bitreader::BitReaderLsb;
+use crate::bitreader::{BitReaderLsb, BitReaderMsb};
 
 /// An empty (not-yet-assigned) tree node: both branches open. Encoded with the
 /// same `-1`/`-2` sentinels as XADMaster so a half-built internal node (one
@@ -99,6 +99,61 @@ impl PrefixCode {
         self.finish_branches();
     }
 
+    /// A code that always decodes to `value` while consuming no bits: a tree
+    /// whose root is itself a leaf. Mirrors XADMaster's
+    /// `addValue:forCodeWithHighBitFirst:0 length:0`, used for the
+    /// single-symbol blocks of LZH-static.
+    pub fn single_symbol(value: i32) -> Self {
+        let mut code = Self::new();
+        code.tree[0] = [value, value];
+        code
+    }
+
+    /// Add one code for `value`, given as `length` bits with the
+    /// most-significant bit consumed first (the order [`next_symbol_msb`]
+    /// reads). A `length` of 0 turns the root into a leaf (see
+    /// [`single_symbol`](Self::single_symbol)).
+    pub fn add_value_high_bit_first(&mut self, value: i32, code: u32, length: u32) {
+        let mut node = 0usize;
+        for bitpos in (0..length).rev() {
+            let bit = ((code >> bitpos) & 1) as usize;
+            if self.tree[node][bit] < 0 {
+                let new = self.new_node() as i32;
+                self.tree[node][bit] = new;
+            }
+            node = self.tree[node][bit] as usize;
+        }
+        self.tree[node] = [value, value];
+    }
+
+    /// Build a canonical prefix code from per-symbol code `lengths` (index =
+    /// symbol value, length 0 = symbol absent). Codes are assigned shortest
+    /// first, high-bit-first, exactly as XADMaster's
+    /// `initWithLengths:…shortestCodeIsZeros:`. With `shortest_code_is_zeros`
+    /// the raw counter is used; otherwise its bitwise complement (the two
+    /// conventions for which end of the code space is filled first).
+    pub fn from_lengths(lengths: &[u32], max_length: u32, shortest_code_is_zeros: bool) -> Self {
+        let mut out = Self::new();
+        let mut code: u32 = 0;
+        let mut left = lengths.len();
+        for length in 1..=max_length {
+            for (i, &len) in lengths.iter().enumerate() {
+                if len != length {
+                    continue;
+                }
+                let c = if shortest_code_is_zeros { code } else { !code };
+                out.add_value_high_bit_first(i as i32, c, length);
+                code += 1;
+                left -= 1;
+                if left == 0 {
+                    return out; // every symbol placed; the rest are length 0
+                }
+            }
+            code <<= 1;
+        }
+        out
+    }
+
     /// Add one code for `value`, given as `length` bits with the
     /// least-significant bit consumed first (the order [`next_symbol_le`]
     /// reads). Used for statically-defined code tables.
@@ -121,6 +176,26 @@ impl PrefixCode {
         let mut node = 0usize;
         while !self.is_leaf(node) {
             let bit = match bits.read_bit()? {
+                Some(b) => b as usize,
+                None => return Ok(None),
+            };
+            let next = self.tree[node][bit];
+            if next < 0 {
+                return Err(invalid("prefix code: invalid code in bitstream"));
+            }
+            node = next as usize;
+        }
+        Ok(Some(self.tree[node][0]))
+    }
+
+    /// Decode the next symbol, reading bits most-significant-first from `bits`.
+    /// `Ok(None)` if the bitstream ends before a leaf is reached. A
+    /// [`single_symbol`](Self::single_symbol) code returns its value at once,
+    /// consuming nothing.
+    pub fn next_symbol_msb<R: Read>(&self, bits: &mut BitReaderMsb<R>) -> io::Result<Option<i32>> {
+        let mut node = 0usize;
+        while !self.is_leaf(node) {
+            let bit = match bits.read(1)? {
                 Some(b) => b as usize,
                 None => return Ok(None),
             };
@@ -218,5 +293,48 @@ mod tests {
 
         let mut bits = BitReaderLsb::new(Cursor::new(Vec::new()));
         assert_eq!(code.next_symbol_le(&mut bits).unwrap(), None);
+    }
+
+    use crate::bitreader::BitReaderMsb;
+
+    /// Decode exactly `count` symbols MSB-first.
+    fn decode_n_msb(code: &PrefixCode, stream: &[u8], count: usize) -> Vec<i32> {
+        let mut bits = BitReaderMsb::new(Cursor::new(stream.to_vec()));
+        (0..count)
+            .map(|_| code.next_symbol_msb(&mut bits).unwrap().unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn from_lengths_builds_canonical_high_bit_first_code() {
+        // Lengths [1,2,3,3] (zeros=true) -> canonical codes A=0, B=10, C=110,
+        // D=111. Encoding A,B,C,D MSB-first gives bits 0|10|110|111 = 0x5B,0x80.
+        let code = PrefixCode::from_lengths(&[1, 2, 3, 3], 16, true);
+        assert_eq!(decode_n_msb(&code, &[0x5B, 0x80], 4), vec![0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn single_symbol_returns_value_without_consuming_bits() {
+        // A zero-length code: every read yields the value and consumes no bits.
+        let code = PrefixCode::single_symbol(42);
+        let mut bits = BitReaderMsb::new(Cursor::new(Vec::new()));
+        assert_eq!(code.next_symbol_msb(&mut bits).unwrap(), Some(42));
+        assert_eq!(code.next_symbol_msb(&mut bits).unwrap(), Some(42));
+    }
+
+    #[test]
+    fn next_symbol_msb_open_branch_is_invalid_code() {
+        // Codes 00->0, 01->1; the root's 1-branch stays open. A leading 1 bit
+        // (byte 0x80) steers into it.
+        let code = PrefixCode::from_lengths(&[2, 2], 16, true);
+        let mut bits = BitReaderMsb::new(Cursor::new(vec![0x80u8]));
+        assert!(code.next_symbol_msb(&mut bits).is_err());
+    }
+
+    #[test]
+    fn next_symbol_msb_empty_bitstream_yields_none() {
+        let code = PrefixCode::from_lengths(&[1, 1], 16, true);
+        let mut bits = BitReaderMsb::new(Cursor::new(Vec::new()));
+        assert_eq!(code.next_symbol_msb(&mut bits).unwrap(), None);
     }
 }

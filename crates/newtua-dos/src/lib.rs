@@ -16,6 +16,7 @@ pub mod crush;
 pub mod distill;
 pub mod lbr;
 pub mod squeeze;
+pub mod zoo;
 
 /// Shared test helpers.
 #[cfg(test)]
