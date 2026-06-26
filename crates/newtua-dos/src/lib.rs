@@ -10,11 +10,13 @@
 #![forbid(unsafe_code)]
 
 pub mod arc;
+pub mod arj;
 pub mod crunch;
 pub mod crunch_cpm;
 pub mod crush;
 pub mod distill;
 pub mod lbr;
+pub(crate) mod lzh_static;
 pub mod squeeze;
 pub mod zoo;
 
