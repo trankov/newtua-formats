@@ -5,6 +5,7 @@ resolver = "2"
 members = [
     "crates/newtua-common",
     "crates/newtua-dos",
+    "crates/newtua-mac",
     "crates/newtua-amiga",
     "crates/newtua-alz",
     "crates/newtua-testutil",
