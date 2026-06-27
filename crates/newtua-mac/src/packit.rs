@@ -32,8 +32,9 @@ use std::io::{self, Read, Write};
 
 use newtua_common::crc16::crc16_ccitt;
 
+use newtua_common::stuffit_huffman::StuffItHuffman;
+
 use crate::des;
-use crate::stuffit_huffman::StuffItHuffman;
 
 fn invalid(msg: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, msg.into())

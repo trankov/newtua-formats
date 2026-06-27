@@ -1,5 +1,5 @@
 //! StuffIt Huffman decoder — the compression used inside PackIt's `PMa4/5/6`
-//! records.
+//! records and classic StuffIt's method 3.
 //!
 //! Faithful port of XADMaster's `XADStuffItHuffmanHandle`. The code tree is
 //! written directly into the bit stream, most-significant-bit first:
@@ -18,7 +18,7 @@
 
 use std::io;
 
-use newtua_common::prefixcode::PrefixCode;
+use crate::prefixcode::PrefixCode;
 
 fn unexpected_eof() -> io::Error {
     io::Error::new(
@@ -69,7 +69,7 @@ impl<'a> BitCursor<'a> {
 
 /// A StuffIt Huffman stream: the decoded code tree plus the bit cursor over the
 /// (already decrypted, if applicable) source bytes.
-pub(crate) struct StuffItHuffman<'a> {
+pub struct StuffItHuffman<'a> {
     cursor: BitCursor<'a>,
     code: PrefixCode,
 }
@@ -77,7 +77,7 @@ pub(crate) struct StuffItHuffman<'a> {
 impl<'a> StuffItHuffman<'a> {
     /// Read the code tree from the front of `data`, leaving the cursor at the
     /// first symbol.
-    pub(crate) fn new(data: &'a [u8]) -> io::Result<Self> {
+    pub fn new(data: &'a [u8]) -> io::Result<Self> {
         let mut me = Self {
             cursor: BitCursor::new(data),
             code: PrefixCode::new(),
@@ -118,7 +118,7 @@ impl<'a> StuffItHuffman<'a> {
     }
 
     /// Decode exactly `n` output bytes.
-    pub(crate) fn read_exact(&mut self, n: usize) -> io::Result<Vec<u8>> {
+    pub fn read_exact(&mut self, n: usize) -> io::Result<Vec<u8>> {
         let mut out = Vec::with_capacity(n);
         for _ in 0..n {
             out.push(self.next_byte()?);
@@ -127,7 +127,7 @@ impl<'a> StuffItHuffman<'a> {
     }
 
     /// Source bytes consumed so far, rounded up to a byte boundary.
-    pub(crate) fn consumed_bytes(&self) -> usize {
+    pub fn consumed_bytes(&self) -> usize {
         self.cursor.consumed_bytes()
     }
 }

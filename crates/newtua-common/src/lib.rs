@@ -20,6 +20,7 @@ pub mod lzss;
 pub mod lzw;
 pub mod prefixcode;
 pub mod rle90;
+pub mod stuffit_huffman;
 
 /// Read one byte from `r`, retrying on `Interrupted`; `None` at end of input.
 ///

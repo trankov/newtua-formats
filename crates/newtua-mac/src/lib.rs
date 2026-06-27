@@ -15,4 +15,3 @@ pub mod macbinary;
 pub mod packit;
 
 pub(crate) mod des;
-pub(crate) mod stuffit_huffman;
