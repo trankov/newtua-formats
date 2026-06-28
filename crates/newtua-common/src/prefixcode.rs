@@ -25,6 +25,7 @@ fn invalid(msg: &str) -> io::Error {
 }
 
 /// A prefix-code tree mapping bit sequences to integer symbol values.
+#[derive(Clone)]
 pub struct PrefixCode {
     /// Each node holds its two child links. A negative link is an open branch;
     /// a node whose two links are equal is a leaf carrying that value.

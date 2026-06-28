@@ -8,15 +8,16 @@
 //!
 //! Each fork header names a compression method (low nibble) and an encryption
 //! bit (`0x80`). This crate currently decodes methods **0 (store), 1 (RLE90),
-//! 2 (Unix `compress` / LZW), and 3 (StuffIt-Huffman)**, all of which reuse the
-//! shared primitives in [`newtua_common`]. The header CRC and each fork's
-//! content CRC are verified with CRC-16/ARC.
+//! 2 (Unix `compress` / LZW), 3 (StuffIt-Huffman), and 13 (LZ + Huffman)** —
+//! the first four reuse the shared primitives in [`newtua_common`]; method 13
+//! lives in its own `stuffit13` module. The header CRC and each fork's content
+//! CRC are verified with CRC-16/ARC.
 //!
 //! Faithful port of XADMaster's `XADStuffItParser`.
 //!
 //! # Known limitations (out of scope)
 //!
-//! * Compression methods 5/6/8/13/14/15 are not implemented yet (the later
+//! * Compression methods 5/6/8/14/15 are not implemented yet (the later
 //!   sub-stages of this port); reading such a fork returns
 //!   [`io::ErrorKind::Unsupported`].
 //! * Encryption (method bit `0x80`) is not supported. Classic StuffIt encrypts
@@ -39,6 +40,8 @@ use newtua_common::compress::CompressReader;
 use newtua_common::crc16::crc16_arc;
 use newtua_common::rle90::Rle90Reader;
 use newtua_common::stuffit_huffman::StuffItHuffman;
+
+use crate::stuffit13;
 
 /// Size of one entry header.
 const FILE_HEADER_SIZE: usize = 112;
@@ -201,6 +204,7 @@ impl StuffItArchive {
             1 => read_n(Rle90Reader::new(raw), size)?,
             2 => read_n(CompressReader::new(raw, 14, true), size)?,
             3 => StuffItHuffman::new(raw)?.read_exact(size)?,
+            13 => stuffit13::decode(raw, size)?,
             m => {
                 return Err(io::Error::new(
                     io::ErrorKind::Unsupported,
@@ -861,18 +865,18 @@ mod tests {
 
     #[test]
     fn unsupported_method_is_unsupported() {
-        // Method 13 (LZ+Huffman) is a later sub-stage.
+        // Method 14 (Installer) is still a later sub-stage.
         let arc = build_archive(&[Node::File(FileSpec {
             name: b"lz",
             file_type: *b"TEXT",
             creator: *b"ttxt",
             rsrc: None,
             // Build with method 0 bytes (so the body is store), but stamp the
-            // header method to 13 afterwards.
+            // header method to 14 afterwards.
             data: Some(fork(0, b"payload")),
         })]);
         let mut arc = arc;
-        arc[ARCHIVE_HEADER_SIZE + 1] = 13; // datamethod
+        arc[ARCHIVE_HEADER_SIZE + 1] = 14; // datamethod
         let h = ARCHIVE_HEADER_SIZE;
         let newcrc = crc16_arc(&arc[h..h + 110]);
         arc[h + 110..h + 112].copy_from_slice(&newcrc.to_be_bytes());
