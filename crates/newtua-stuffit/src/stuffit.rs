@@ -36,14 +36,9 @@
 
 use std::io::{self, Read, Write};
 
-use newtua_common::compress::CompressReader;
 use newtua_common::crc16::crc16_arc;
-use newtua_common::rle90::Rle90Reader;
-use newtua_common::stuffit_huffman::StuffItHuffman;
 
-use crate::stuffit13;
-use crate::stuffit15;
-use crate::stuffit5;
+use crate::methods;
 
 /// Size of one entry header.
 const FILE_HEADER_SIZE: usize = 112;
@@ -60,8 +55,6 @@ const ENCRYPTED_FLAG: u8 = 0x80;
 const FOLDER_CONTAINS_ENCRYPTED: u8 = 0x10;
 /// Folder-marker mask: strip the encryption and folder-encrypted bits.
 const FOLDER_MASK: u8 = !(ENCRYPTED_FLAG | FOLDER_CONTAINS_ENCRYPTED);
-/// Mask selecting the codec from a method byte (the low nibble).
-const METHOD_MASK: u8 = 0x0f;
 
 fn invalid(msg: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, msg.into())
@@ -201,25 +194,8 @@ impl StuffItArchive {
             .ok_or_else(|| invalid("stuffit: fork data past end of archive"))?;
         let size = e.size as usize;
 
-        let decoded = match fork.method & METHOD_MASK {
-            0 => raw.get(..size).ok_or_else(unexpected_eof)?.to_vec(),
-            1 => read_n(Rle90Reader::new(raw), size)?,
-            2 => read_n(CompressReader::new(raw, 14, true), size)?,
-            3 => StuffItHuffman::new(raw)?.read_exact(size)?,
-            5 => stuffit5::decode(raw, size)?,
-            13 => stuffit13::decode(raw, size)?,
-            15 => stuffit15::decode(raw, size)?,
-            m => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Unsupported,
-                    format!("stuffit: compression method {m} is not supported"),
-                ))
-            }
-        };
-
-        if crc16_arc(&decoded) != fork.crc {
-            return Err(invalid("stuffit: fork CRC mismatch"));
-        }
+        let decoded = methods::decode_fork(fork.method, raw, size)?;
+        methods::verify_content_crc(fork.method, &decoded, fork.crc)?;
         out.write_all(&decoded)
     }
 }
@@ -236,13 +212,6 @@ fn recognize(data: &[u8]) -> bool {
     // A classic StuffIt archive is `SIT!` at offset 0 and `rLau` at offset 10.
     // (ST-installer variants exist; they are out of scope for now.)
     data.len() >= 14 && &data[0..4] == b"SIT!" && &data[10..14] == b"rLau"
-}
-
-/// Read exactly `n` bytes from `r`.
-fn read_n(mut r: impl Read, n: usize) -> io::Result<Vec<u8>> {
-    let mut v = vec![0u8; n];
-    r.read_exact(&mut v)?;
-    Ok(v)
 }
 
 /// Join the folder stack and a leaf name with `/` (root has no prefix).
