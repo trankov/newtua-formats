@@ -26,12 +26,17 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use newtua_common::crc16::crc16_arc;
+use newtua_common::md5::md5;
+use newtua_common::rc4::Rc4;
 use newtua_stuffit::sit5::StuffIt5Archive;
 use newtua_testutil::unar_installed;
 
 const SIT5_ID: u32 = 0xA5A5_A5A5;
 const HEADER_LEN: usize = 100;
 const DIRECTORY: u8 = 0x40;
+const ENTRY_CRYPTED: u8 = 0x20;
+const ARCHIVE_CRYPTED: u8 = 0x80;
+const KEY_LENGTH: usize = 5;
 
 const BANNER: &[u8] =
     b"StuffIt (c)1997-\xFF\xFF\xFF\xFF Aladdin Systems, Inc., http://www.aladdinsys.com/StuffIt/\x0d\x0a";
@@ -372,6 +377,105 @@ fn unar_matches_tree_both_forks() {
 
     let top = fs::read(dir.join("top")).unwrap();
     assert_eq!(top, b"top level store");
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// === encryption oracle (RC4 + MD5) ============================================
+
+const PASSWORD: &[u8] = b"opensesame";
+const ENTRYKEY: [u8; KEY_LENGTH] = [0x11, 0x22, 0x33, 0x44, 0x55];
+
+/// The first five bytes of `MD5(data)` — StuffIt 5's `StuffItMD5`.
+fn stuffit_md5(data: &[u8]) -> [u8; KEY_LENGTH] {
+    let h = md5(data);
+    [h[0], h[1], h[2], h[3], h[4]]
+}
+
+/// One-file archive with an encrypted data fork (`method`, `PASSWORD`).
+fn build_encrypted_sit(name: &[u8], content: &[u8], method: u8) -> Vec<u8> {
+    let archivekey = stuffit_md5(PASSWORD);
+    let hash = stuffit_md5(&archivekey);
+    let mut rc4_key = archivekey.to_vec();
+    rc4_key.extend_from_slice(&ENTRYKEY);
+
+    let mut fork_bytes = compress(method, content);
+    Rc4::new(&rc4_key).apply(&mut fork_bytes);
+
+    let mut prefix = entry_prefix(
+        ENTRY_CRYPTED,
+        0,
+        name.len(),
+        content.len() as u32,
+        fork_bytes.len() as u32,
+        crc16(content, method),
+        method as u16,
+    );
+    prefix[47] = KEY_LENGTH as u8; // passlen
+    let mut records = Vec::new();
+    records.extend_from_slice(&prefix);
+    records.extend_from_slice(&ENTRYKEY);
+    records.extend_from_slice(name);
+    records.extend_from_slice(&second_block(None));
+    records.extend_from_slice(&fork_bytes);
+
+    let mut arc = vec![0u8; HEADER_LEN];
+    let mut banner = BANNER.to_vec();
+    for (i, b) in banner.iter_mut().enumerate() {
+        if *b == 0xFF {
+            *b = b"2000"[i - 16];
+        }
+    }
+    arc[..banner.len()].copy_from_slice(&banner);
+    arc[82] = 5;
+    arc[83] = ARCHIVE_CRYPTED;
+    arc[92..94].copy_from_slice(&1u16.to_be_bytes());
+    let mut block = vec![KEY_LENGTH as u8];
+    block.extend_from_slice(&hash);
+    arc[94..98].copy_from_slice(&((HEADER_LEN + block.len()) as u32).to_be_bytes());
+    arc.extend_from_slice(&block);
+    arc.extend_from_slice(&records);
+    let totalsize = arc.len() as u32;
+    arc[84..88].copy_from_slice(&totalsize.to_be_bytes());
+    arc
+}
+
+#[test]
+fn mirror_roundtrip_encrypted() {
+    let content = b"a secret message hidden behind rc4 and a huffman code";
+    let arc = build_encrypted_sit(b"secret", content, 3);
+    let a = StuffIt5Archive::open_with_password(&arc[..], PASSWORD).unwrap();
+    assert!(a.entries()[0].is_encrypted());
+    let mut out = Vec::new();
+    a.read_entry(0, &mut out).unwrap();
+    assert_eq!(out, content);
+}
+
+#[test]
+fn unar_matches_encrypted() {
+    if !unar_installed() {
+        eprintln!("skipping: unar not installed");
+        return;
+    }
+    let content = b"a secret message hidden behind rc4 and a huffman code";
+    let arc = build_encrypted_sit(b"secret", content, 3);
+    let dir = temp_dir("enc");
+    let path = dir.join("enc.sit");
+    fs::write(&path, &arc).unwrap();
+
+    let status = Command::new("unar")
+        .args(["-quiet", "-force-overwrite", "-no-directory"])
+        .arg("-password")
+        .arg(std::str::from_utf8(PASSWORD).unwrap())
+        .arg("-output-directory")
+        .arg(&dir)
+        .arg(&path)
+        .status()
+        .expect("run unar");
+    assert!(status.success(), "unar failed");
+
+    let data = fs::read(dir.join("secret")).unwrap();
+    assert_eq!(data, content);
 
     let _ = fs::remove_dir_all(&dir);
 }

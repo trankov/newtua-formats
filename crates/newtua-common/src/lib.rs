@@ -18,7 +18,9 @@ pub mod crc16;
 pub mod crc32;
 pub mod lzss;
 pub mod lzw;
+pub mod md5;
 pub mod prefixcode;
+pub mod rc4;
 pub mod rle90;
 pub mod stuffit_huffman;
 

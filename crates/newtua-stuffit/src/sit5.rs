@@ -13,18 +13,23 @@
 //! Faithful port of XADMaster's `XADStuffIt5Parser` (and the self-extracting
 //! `XADStuffIt5ExeParser`).
 //!
-//! # Known limitations (out of scope for 15a)
+//! Encryption (archive flag `0x80` / entry flag `0x20`) is supported: the
+//! archive password hash and each fork's 40-bit key are parsed, the password is
+//! verified via MD5, and the fork is decrypted with RC4 before decompression —
+//! see [`StuffIt5Archive::open_with_password`]. Faithful port of
+//! `keyForEntryWithDictionary:` + `decryptHandleForEntryWithDictionary:`.
 //!
-//! * Encryption (archive flag `0x80` / entry flag `0x20`) is parsed — the archive
-//!   password hash and each fork's 40-bit key are read so offsets stay in sync —
-//!   but reading an encrypted fork returns [`io::ErrorKind::Unsupported`]. RC4 +
-//!   MD5 decryption is a separate sub-stage (15b).
+//! # Known limitations (out of scope)
+//!
 //! * The archive comment and per-entry comments are skipped, not exposed.
 //! * Filenames are kept as raw bytes (MacRoman), full path joined with `/`.
 //! * Dates and Finder flags are parsed into entry fields only.
 
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
+
+use newtua_common::md5::md5;
+use newtua_common::rc4::Rc4;
 
 use crate::methods;
 
@@ -72,8 +77,7 @@ struct ForkInfo {
     method: u8,
     /// Stored CRC-16/ARC of the decoded fork (unused for method 15).
     crc: u16,
-    /// 40-bit entry key, present only for encrypted forks (kept for 15b).
-    #[allow(dead_code)]
+    /// 40-bit entry key, present only for encrypted forks.
     key: Option<[u8; KEY_LENGTH]>,
 }
 
@@ -143,12 +147,13 @@ impl StuffIt5Entry {
 pub struct StuffIt5Archive {
     data: Vec<u8>,
     entries: Vec<StuffIt5Entry>,
-    /// Archive password hash, present when the archive is encrypted (for 15b).
-    #[allow(dead_code)]
+    /// Archive password hash, present when the archive is encrypted.
     password_hash: Option<[u8; KEY_LENGTH]>,
-    /// Whether the archive as a whole is marked encrypted (for 15b).
+    /// Whether the archive as a whole is marked encrypted.
     #[allow(dead_code)]
     is_encrypted: bool,
+    /// The password supplied to [`Self::open_with_password`], raw bytes.
+    password: Option<Vec<u8>>,
 }
 
 impl StuffIt5Archive {
@@ -159,8 +164,21 @@ impl StuffIt5Archive {
     }
 
     /// Read and parse a StuffIt 5 archive from `r`. Handles the plain container
-    /// and the self-extracting `.exe` variant transparently.
-    pub fn open<R: Read>(mut r: R) -> io::Result<Self> {
+    /// and the self-extracting `.exe` variant transparently. Reading an
+    /// encrypted fork then returns [`io::ErrorKind::InvalidInput`]; use
+    /// [`open_with_password`](Self::open_with_password) for encrypted archives.
+    pub fn open<R: Read>(r: R) -> io::Result<Self> {
+        Self::open_inner(r, None)
+    }
+
+    /// Like [`open`](Self::open), but remembers `password` (raw MacRoman bytes;
+    /// encoding is the caller's choice) so encrypted forks can be decrypted.
+    /// Unencrypted forks ignore the password.
+    pub fn open_with_password<R: Read>(r: R, password: &[u8]) -> io::Result<Self> {
+        Self::open_inner(r, Some(password.to_vec()))
+    }
+
+    fn open_inner<R: Read>(mut r: R, password: Option<Vec<u8>>) -> io::Result<Self> {
         let mut data = Vec::new();
         r.read_to_end(&mut data)?;
 
@@ -176,6 +194,7 @@ impl StuffIt5Archive {
             entries: parsed.entries,
             password_hash: parsed.password_hash,
             is_encrypted: parsed.is_encrypted,
+            password,
         })
     }
 
@@ -186,8 +205,9 @@ impl StuffIt5Archive {
     }
 
     /// Write entry `idx`'s decoded fork bytes to `out`. Directories write
-    /// nothing. Encrypted or unsupported-method forks return
-    /// [`io::ErrorKind::Unsupported`].
+    /// nothing. An unsupported-method fork returns [`io::ErrorKind::Unsupported`];
+    /// an encrypted fork opened without a password (or with a wrong one) returns
+    /// [`io::ErrorKind::InvalidInput`].
     pub fn read_entry(&self, idx: usize, out: &mut dyn Write) -> io::Result<()> {
         let e = self
             .entries
@@ -197,19 +217,62 @@ impl StuffIt5Archive {
             None => return Ok(()), // a directory: no data
             Some(f) => f,
         };
-        if e.is_encrypted {
-            return Err(unsupported("stuffit5: encrypted entries are not supported"));
-        }
         let raw = self
             .data
             .get(fork.offset..fork.offset + fork.complen)
             .ok_or_else(|| invalid("stuffit5: fork data past end of archive"))?;
         let size = e.size as usize;
 
-        let decoded = methods::decode_fork(fork.method, raw, size)?;
+        // For an encrypted fork, decrypt the whole compressed block with RC4
+        // first; both paths then share the same decode + CRC tail.
+        let mut decrypted;
+        let input: &[u8] = if e.is_encrypted {
+            decrypted = raw.to_vec();
+            Rc4::new(&self.entry_key(fork)?).apply(&mut decrypted);
+            &decrypted
+        } else {
+            raw
+        };
+        let decoded = methods::decode_fork(fork.method, input, size)?;
         methods::verify_content_crc(fork.method, &decoded, fork.crc)?;
         out.write_all(&decoded)
     }
+
+    /// Derive the 10-byte RC4 key for an encrypted `fork`, verifying the password
+    /// against the archive hash. Port of `keyForEntryWithDictionary:`:
+    /// `archivekey = MD5(password)[..5]`, checked via `MD5(archivekey)[..5] ==
+    /// stored hash`, then the entry key is `archivekey ++ entrykey`.
+    fn entry_key(&self, fork: &ForkInfo) -> io::Result<[u8; 2 * KEY_LENGTH]> {
+        let password = self.password.as_deref().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "stuffit5: password required for encrypted entry",
+            )
+        })?;
+        let hash = self
+            .password_hash
+            .ok_or_else(|| invalid("stuffit5: encrypted entry without an archive password hash"))?;
+        let archivekey = stuffit_md5(password);
+        if stuffit_md5(&archivekey) != hash {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "stuffit5: incorrect password",
+            ));
+        }
+        let entrykey = fork
+            .key
+            .ok_or_else(|| invalid("stuffit5: encrypted fork without a key"))?;
+        let mut key = [0u8; 2 * KEY_LENGTH];
+        key[..KEY_LENGTH].copy_from_slice(&archivekey);
+        key[KEY_LENGTH..].copy_from_slice(&entrykey);
+        Ok(key)
+    }
+}
+
+/// The first five bytes of `MD5(data)` — StuffIt 5's `StuffItMD5`.
+fn stuffit_md5(data: &[u8]) -> [u8; KEY_LENGTH] {
+    let h = md5(data);
+    [h[0], h[1], h[2], h[3], h[4]]
 }
 
 // === recognition ==============================================================
@@ -686,8 +749,6 @@ mod tests {
         creator: [u8; 4],
         rsrc: Option<ForkSpec>,
         data: Option<ForkSpec>,
-        /// Encrypt this file's forks (CRYPTED flag + 5-byte key placeholders).
-        encrypted: bool,
     }
 
     impl FileSpec {
@@ -698,7 +759,6 @@ mod tests {
                 creator: *b"ttxt",
                 rsrc,
                 data,
-                encrypted: false,
             }
         }
     }
@@ -797,36 +857,19 @@ mod tests {
                 let rcrc = f.rsrc.as_ref().map_or(0, |r| crc16(&r.content, r.method));
                 let dcrc = f.data.as_ref().map_or(0, |d| crc16(&d.content, d.method));
 
-                let flags = if f.encrypted { ENTRYFLAGS_CRYPTED } else { 0 };
-                let mut prefix = entry_prefix(
-                    flags,
+                records.extend_from_slice(&entry_prefix(
+                    0,
                     parent_offs,
                     f.name.len(),
                     dlen,
                     dcomplen,
                     dcrc,
                     dmethod as u16,
-                );
-                // For an encrypted data fork, patch passlen to 5 and append the key.
-                let mut key_data = Vec::new();
-                if f.encrypted && dlen != 0 {
-                    prefix[47] = KEY_LENGTH as u8;
-                    key_data = vec![0xAA; KEY_LENGTH];
-                }
-
-                records.extend_from_slice(&prefix);
-                records.extend_from_slice(&key_data);
+                ));
                 records.extend_from_slice(f.name);
 
                 let rsrc_desc = f.rsrc.as_ref().map(|_| (rlen, rcomplen, rcrc, rmethod));
-                let mut sb = second_block(f.file_type, f.creator, rsrc_desc);
-                if f.encrypted && rlen != 0 {
-                    // Patch the resource passlen (last byte) and append its key.
-                    let last = sb.len() - 1;
-                    sb[last] = KEY_LENGTH as u8;
-                    sb.extend_from_slice(&[0xBB; KEY_LENGTH]);
-                }
-                records.extend_from_slice(&sb);
+                records.extend_from_slice(&second_block(f.file_type, f.creator, rsrc_desc));
 
                 if let Some(c) = rcomp {
                     records.extend_from_slice(&c);
@@ -847,14 +890,11 @@ mod tests {
         }
     }
 
-    fn build_archive(nodes: &[Node]) -> Vec<u8> {
-        let mut records = Vec::new();
-        for node in nodes {
-            emit(node, 0, &mut records);
-        }
-
+    /// The 100-byte base archive header: banner (wildcards filled with "2000"),
+    /// version 5, `flags`, top-level `numfiles`, and `firstoffs`. `totalsize`
+    /// (offset 84) is left zero for the caller to patch after appending records.
+    fn base_header(flags: u8, numfiles: u16, firstoffs: u32) -> Vec<u8> {
         let mut arc = vec![0u8; HEADER_LEN];
-        // Signature banner (wildcards filled with the year "2000").
         let mut banner = BANNER.to_vec();
         for (i, b) in banner.iter_mut().enumerate() {
             if *b == 0xFF {
@@ -863,9 +903,18 @@ mod tests {
         }
         arc[..banner.len()].copy_from_slice(&banner);
         arc[82] = SIT5_VERSION;
-        arc[83] = 0; // archive flags
-        arc[92..94].copy_from_slice(&(nodes.len() as u16).to_be_bytes());
-        arc[94..98].copy_from_slice(&(HEADER_LEN as u32).to_be_bytes());
+        arc[83] = flags;
+        arc[92..94].copy_from_slice(&numfiles.to_be_bytes());
+        arc[94..98].copy_from_slice(&firstoffs.to_be_bytes());
+        arc
+    }
+
+    fn build_archive(nodes: &[Node]) -> Vec<u8> {
+        let mut records = Vec::new();
+        for node in nodes {
+            emit(node, 0, &mut records);
+        }
+        let mut arc = base_header(0, nodes.len() as u16, HEADER_LEN as u32);
         arc.extend_from_slice(&records);
         let totalsize = arc.len() as u32;
         arc[84..88].copy_from_slice(&totalsize.to_be_bytes());
@@ -1061,7 +1110,6 @@ mod tests {
             creator: *b"CODE",
             rsrc: None,
             data: Some(fork(0, b"x")),
-            encrypted: false,
         })]);
         let a = open(&arc);
         assert_eq!(a.entries()[0].file_type(), *b"APPL");
@@ -1083,24 +1131,97 @@ mod tests {
         assert_eq!(read(&a, 0), b"");
     }
 
-    // === encryption (parsed, read → Unsupported) =============================
+    // === encryption (RC4 + MD5 + password) ===================================
+
+    /// Build a one-file archive with an encrypted data fork: the archive header
+    /// carries the CRYPTED flag and hash, the entry carries the CRYPTED flag and
+    /// a 5-byte key, and the compressed fork is RC4-encrypted with the key
+    /// `MD5(password)[..5] ++ entrykey`.
+    fn build_encrypted_sit(name: &[u8], content: &[u8], method: u8, password: &[u8]) -> Vec<u8> {
+        let archivekey = stuffit_md5(password);
+        let hash = stuffit_md5(&archivekey);
+        let entrykey = [0x11u8, 0x22, 0x33, 0x44, 0x55];
+        let mut rc4_key = archivekey.to_vec();
+        rc4_key.extend_from_slice(&entrykey);
+
+        let mut fork_bytes = compress(method, content);
+        Rc4::new(&rc4_key).apply(&mut fork_bytes);
+
+        // Entry: CRYPTED prefix, patched passlen, 5-byte key, name, second block.
+        let mut prefix = entry_prefix(
+            ENTRYFLAGS_CRYPTED,
+            0,
+            name.len(),
+            content.len() as u32,
+            fork_bytes.len() as u32,
+            crc16(content, method),
+            method as u16,
+        );
+        prefix[47] = KEY_LENGTH as u8; // passlen
+        let mut records = Vec::new();
+        records.extend_from_slice(&prefix);
+        records.extend_from_slice(&entrykey);
+        records.extend_from_slice(name);
+        records.extend_from_slice(&second_block(*b"TEXT", *b"ttxt", None));
+        records.extend_from_slice(&fork_bytes);
+
+        // Archive header with CRYPTED flag + (hashsize=5, hash) block after it.
+        let mut block = vec![KEY_LENGTH as u8];
+        block.extend_from_slice(&hash);
+        let mut arc = base_header(ARCHIVEFLAGS_CRYPTED, 1, (HEADER_LEN + block.len()) as u32);
+        arc.extend_from_slice(&block);
+        arc.extend_from_slice(&records);
+        let totalsize = arc.len() as u32;
+        arc[84..88].copy_from_slice(&totalsize.to_be_bytes());
+        arc
+    }
 
     #[test]
-    fn encrypted_fork_is_unsupported() {
-        let arc = build_archive(&[Node::File(FileSpec {
-            name: b"enc",
-            file_type: *b"TEXT",
-            creator: *b"ttxt",
-            rsrc: None,
-            data: Some(fork(0, b"secret payload")),
-            encrypted: true,
-        })]);
-        let a = open(&arc);
+    fn encrypted_store_fork_roundtrip() {
+        let arc = build_encrypted_sit(b"secret", b"the treasure is buried here", 0, b"hunter2");
+        let a = StuffIt5Archive::open_with_password(&arc[..], b"hunter2").unwrap();
         assert_eq!(a.entries().len(), 1);
+        assert!(a.entries()[0].is_encrypted());
+        assert_eq!(read(&a, 0), b"the treasure is buried here");
+    }
+
+    #[test]
+    fn encrypted_huffman_fork_roundtrip() {
+        // A real codec (method 3) through RC4: decrypt then decompress.
+        let arc = build_encrypted_sit(b"doc", b"huffman huffman under encryption", 3, b"pass");
+        let a = StuffIt5Archive::open_with_password(&arc[..], b"pass").unwrap();
+        assert_eq!(read(&a, 0), b"huffman huffman under encryption");
+    }
+
+    #[test]
+    fn wrong_password_errors() {
+        let arc = build_encrypted_sit(b"secret", b"payload", 0, b"correct");
+        let a = StuffIt5Archive::open_with_password(&arc[..], b"wrong").unwrap();
+        let mut out = Vec::new();
+        let err = a.read_entry(0, &mut out).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn missing_password_errors() {
+        let arc = build_encrypted_sit(b"secret", b"payload", 0, b"correct");
+        let a = open(&arc); // opened without a password
         assert!(a.entries()[0].is_encrypted());
         let mut out = Vec::new();
         let err = a.read_entry(0, &mut out).unwrap_err();
-        assert_eq!(err.kind(), io::ErrorKind::Unsupported);
+        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn password_ignored_for_unencrypted_fork() {
+        let arc = build_archive(&[Node::File(FileSpec::plain(
+            b"plain",
+            Some(fork(0, b"not encrypted")),
+            None,
+        ))]);
+        let a = StuffIt5Archive::open_with_password(&arc[..], b"irrelevant").unwrap();
+        assert!(!a.entries()[0].is_encrypted());
+        assert_eq!(read(&a, 0), b"not encrypted");
     }
 
     #[test]
