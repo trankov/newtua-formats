@@ -8,16 +8,17 @@
 //!
 //! Each fork header names a compression method (low nibble) and an encryption
 //! bit (`0x80`). This crate currently decodes methods **0 (store), 1 (RLE90),
-//! 2 (Unix `compress` / LZW), 3 (StuffIt-Huffman), and 13 (LZ + Huffman)** —
-//! the first four reuse the shared primitives in [`newtua_common`]; method 13
-//! lives in its own `stuffit13` module. The header CRC and each fork's content
-//! CRC are verified with CRC-16/ARC.
+//! 2 (Unix `compress` / LZW), 3 (StuffIt-Huffman), 5 (LZAH / dynamic LZH), and
+//! 13 (LZ + Huffman)** — the first four reuse the shared primitives in
+//! [`newtua_common`]; methods 5 and 13 live in their own `stuffit5` /
+//! `stuffit13` modules. The header CRC and each fork's content CRC are verified
+//! with CRC-16/ARC.
 //!
 //! Faithful port of XADMaster's `XADStuffItParser`.
 //!
 //! # Known limitations (out of scope)
 //!
-//! * Compression methods 5/6/8/14/15 are not implemented yet (the later
+//! * Compression methods 6/8/14/15 are not implemented yet (the later
 //!   sub-stages of this port); reading such a fork returns
 //!   [`io::ErrorKind::Unsupported`].
 //! * Encryption (method bit `0x80`) is not supported. Classic StuffIt encrypts
@@ -42,6 +43,7 @@ use newtua_common::rle90::Rle90Reader;
 use newtua_common::stuffit_huffman::StuffItHuffman;
 
 use crate::stuffit13;
+use crate::stuffit5;
 
 /// Size of one entry header.
 const FILE_HEADER_SIZE: usize = 112;
@@ -204,6 +206,7 @@ impl StuffItArchive {
             1 => read_n(Rle90Reader::new(raw), size)?,
             2 => read_n(CompressReader::new(raw, 14, true), size)?,
             3 => StuffItHuffman::new(raw)?.read_exact(size)?,
+            5 => stuffit5::decode(raw, size)?,
             13 => stuffit13::decode(raw, size)?,
             m => {
                 return Err(io::Error::new(

@@ -40,6 +40,20 @@ impl LzssWindow {
         self.position
     }
 
+    /// Pre-load the entire window with `contents` (whose length must equal the
+    /// window size) without advancing the emit position. Early back-references
+    /// can then read this pre-filled data — the LHA/LZAH-style initial
+    /// dictionary. With the position still at 0, a distance-`d` match reads
+    /// `(0 - d) & mask`, i.e. the pre-filled tail of the window.
+    pub fn prefill(&mut self, contents: &[u8]) {
+        assert_eq!(
+            contents.len(),
+            self.mask + 1,
+            "prefill length must equal window size"
+        );
+        self.buffer.copy_from_slice(contents);
+    }
+
     /// Store `byte` at the current ring position and advance.
     fn push(&mut self, byte: u8, out: &mut Vec<u8>) {
         self.buffer[self.position as usize & self.mask] = byte;
@@ -107,5 +121,25 @@ mod tests {
     #[should_panic(expected = "power of two")]
     fn rejects_non_power_of_two_window() {
         LzssWindow::new(1000);
+    }
+
+    #[test]
+    fn prefill_lets_early_match_read_preloaded_bytes() {
+        // Pre-load an 8-byte window; position stays 0, so an early back-reference
+        // reaches into the pre-filled tail (as in the LHA/LZAH initial dictionary).
+        let mut w = LzssWindow::new(8);
+        w.prefill(&[10, 20, 30, 40, 50, 60, 70, 80]);
+        let mut out = Vec::new();
+        // At position 0 a distance-3 match wraps to the last three pre-filled
+        // bytes: src = (0 - 3) & 7 = 5, 6, 7 -> 60, 70, 80.
+        w.emit_match(3, 3, &mut out);
+        assert_eq!(out, [60, 70, 80]);
+    }
+
+    #[test]
+    #[should_panic(expected = "prefill length")]
+    fn prefill_rejects_wrong_length() {
+        let mut w = LzssWindow::new(8);
+        w.prefill(&[0; 7]);
     }
 }
