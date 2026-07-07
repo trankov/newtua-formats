@@ -7,10 +7,11 @@
 //!
 //! See [`stuffit`] for the classic container and the compression methods it
 //! supports so far (store, RLE90, Unix `compress` / LZW, StuffIt-Huffman, LZAH
-//! (method 5), and LZ + Huffman (method 13)).
+//! (method 5), LZ + Huffman (method 13), and Arsenic (method 15)).
 
 #![forbid(unsafe_code)]
 
 pub mod stuffit;
 mod stuffit13;
+mod stuffit15;
 mod stuffit5;
