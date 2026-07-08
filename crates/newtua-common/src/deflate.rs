@@ -45,11 +45,6 @@ fn truncated() -> io::Error {
     io::Error::new(io::ErrorKind::UnexpectedEof, "deflate: truncated stream")
 }
 
-/// Read one bit, erroring on end of input.
-fn read_bit(bits: &mut BitReaderLsb<&[u8]>) -> io::Result<bool> {
-    bits.read_bit()?.ok_or_else(truncated)
-}
-
 /// Read an `n`-bit little-endian field, erroring on end of input.
 fn read_bits(bits: &mut BitReaderLsb<&[u8]>, n: u8) -> io::Result<u32> {
     bits.read_bits(n)?.ok_or_else(truncated)
@@ -88,31 +83,6 @@ fn fixed_literal_code() -> PrefixCode {
 /// The fixed distance code lengths: all 32 symbols are 5 bits.
 fn fixed_distance_code() -> PrefixCode {
     PrefixCode::from_lengths(&[5u32; 32], 5, true)
-}
-
-/// Parse a block header (`lastblock`, `type`, and any code tables), returning
-/// the block and whether it was flagged as the last one.
-fn read_block_header(
-    bits: &mut BitReaderLsb<&[u8]>,
-    meta_order: &[u8; 19],
-) -> io::Result<(Block, bool)> {
-    let lastblock = read_bit(bits)?;
-    let btype = read_bits(bits, 2)?;
-    let block = match btype {
-        0 => {
-            bits.align_to_byte();
-            let count = read_bits(bits, 16)?;
-            let ncount = read_bits(bits, 16)?;
-            if count != (ncount ^ 0xffff) {
-                return Err(invalid("deflate: stored block length check failed"));
-            }
-            Block::Stored(count as usize)
-        }
-        1 => Block::Huffman(fixed_literal_code(), fixed_distance_code()),
-        2 => parse_dynamic_block(bits, meta_order)?,
-        _ => return Err(invalid("deflate: reserved block type")),
-    };
-    Ok((block, lastblock))
 }
 
 /// Parse a dynamic-Huffman block header: the meta code, then the run-length
@@ -197,36 +167,119 @@ fn decode_distance(distance: i32, bits: &mut BitReaderLsb<&[u8]>) -> io::Result<
 }
 
 pub fn inflate(input: &[u8], size: usize, meta_order: &[u8; 19]) -> io::Result<Vec<u8>> {
+    inflate_impl(input, Some(size), meta_order, false)
+}
+
+/// Inflate NSIS's modified deflate variant, decoding until the stream ends.
+///
+/// A faithful port of `XADDeflateHandle`'s `XADNSISDeflateVariant`. It differs
+/// from plain deflate in two ways ([`XADDeflateHandle.m`]):
+///
+/// 1. **Stored blocks carry no length-complement.** Plain deflate follows the
+///    16-bit `LEN` with its one's-complement `NLEN` and checks them; NSIS omits
+///    `NLEN` entirely, so it is neither read nor verified.
+/// 2. **The stream may end without a final end-of-block symbol.** When the input
+///    is exhausted at a block boundary, decoding stops cleanly ("there are a few
+///    bytes left" — the reference's own comment) rather than erroring.
+///
+/// The uncompressed size is not known ahead of time (NSIS relies on the stream
+/// ending), so the whole stream is decoded into the returned buffer.
+pub fn inflate_nsis(input: &[u8]) -> io::Result<Vec<u8>> {
+    inflate_impl(input, None, &ZIP_ORDER, true)
+}
+
+/// Read a block header, returning `None` if the input is already exhausted at
+/// the `lastblock` bit — the boundary where NSIS's variant stops. A partial
+/// header (bits present but too few) is still a truncation error.
+fn read_block_header_opt(
+    bits: &mut BitReaderLsb<&[u8]>,
+    meta_order: &[u8; 19],
+    nsis: bool,
+) -> io::Result<Option<(Block, bool)>> {
+    let lastblock = match bits.read_bit()? {
+        Some(b) => b,
+        None => return Ok(None),
+    };
+    let btype = read_bits(bits, 2)?;
+    let block = match btype {
+        0 => {
+            bits.align_to_byte();
+            let count = read_bits(bits, 16)?;
+            // Plain deflate verifies the complement; NSIS omits it entirely, so
+            // for that variant the two complement bytes are not even present.
+            if !nsis {
+                let ncount = read_bits(bits, 16)?;
+                if count != (ncount ^ 0xffff) {
+                    return Err(invalid("deflate: stored block length check failed"));
+                }
+            }
+            Block::Stored(count as usize)
+        }
+        1 => Block::Huffman(fixed_literal_code(), fixed_distance_code()),
+        2 => parse_dynamic_block(bits, meta_order)?,
+        _ => return Err(invalid("deflate: reserved block type")),
+    };
+    Ok(Some((block, lastblock)))
+}
+
+/// Shared inflate core. `size` bounds the output (plain deflate, known size) or
+/// is `None` (NSIS, decode to stream end). When `nsis` is set, input exhaustion
+/// at a block boundary or on a literal ends the stream instead of erroring.
+fn inflate_impl(
+    input: &[u8],
+    size: Option<usize>,
+    meta_order: &[u8; 19],
+    nsis: bool,
+) -> io::Result<Vec<u8>> {
     let mut bits = BitReaderLsb::new(input);
     let mut window = LzssWindow::new(WINDOW_SIZE);
-    let mut out = Vec::with_capacity(size);
+    let mut out = Vec::with_capacity(size.unwrap_or(0));
 
-    let (mut block, mut lastblock) = read_block_header(&mut bits, meta_order)?;
-    while out.len() < size {
+    let (mut block, mut lastblock) = match read_block_header_opt(&mut bits, meta_order, nsis)? {
+        Some(header) => header,
+        None if nsis => return Ok(out),
+        None => return Err(truncated()),
+    };
+
+    loop {
+        if let Some(size) = size {
+            if out.len() >= size {
+                break;
+            }
+        }
+
         let need_new_block = match &mut block {
             Block::Stored(count) => {
                 if *count == 0 {
                     true
                 } else {
-                    *count -= 1;
-                    let byte = read_bits(&mut bits, 8)? as u8;
-                    window.emit_literal(byte, &mut out);
-                    false
+                    match bits.read_bits(8)? {
+                        Some(byte) => {
+                            *count -= 1;
+                            window.emit_literal(byte as u8, &mut out);
+                            false
+                        }
+                        None if nsis => break,
+                        None => return Err(truncated()),
+                    }
                 }
             }
             Block::Huffman(literalcode, distancecode) => {
-                let literal = next_symbol(literalcode, &mut bits)?;
-                if literal == 256 {
-                    true
-                } else if literal < 256 {
-                    window.emit_literal(literal as u8, &mut out);
-                    false
-                } else {
-                    let length = decode_length(literal, &mut bits)?;
-                    let distsym = next_symbol(distancecode, &mut bits)?;
-                    let distance = decode_distance(distsym, &mut bits)?;
-                    window.emit_match(distance, length, &mut out);
-                    false
+                match literalcode.next_symbol_le(&mut bits)? {
+                    None if nsis => break,
+                    None => return Err(truncated()),
+                    Some(256) => true,
+                    Some(literal) if literal < 256 => {
+                        window.emit_literal(literal as u8, &mut out);
+                        false
+                    }
+                    Some(literal) => {
+                        let length = decode_length(literal, &mut bits)?;
+                        let distsym = next_symbol(distancecode, &mut bits)?;
+                        let distance = decode_distance(distsym, &mut bits)?;
+                        window.emit_match(distance, length, &mut out);
+                        false
+                    }
                 }
             }
         };
@@ -234,16 +287,23 @@ pub fn inflate(input: &[u8], size: usize, meta_order: &[u8; 19]) -> io::Result<V
             if lastblock {
                 break;
             }
-            let (b, lb) = read_block_header(&mut bits, meta_order)?;
-            block = b;
-            lastblock = lb;
+            match read_block_header_opt(&mut bits, meta_order, nsis)? {
+                Some((b, lb)) => {
+                    block = b;
+                    lastblock = lb;
+                }
+                None if nsis => break,
+                None => return Err(truncated()),
+            }
         }
     }
 
-    if out.len() < size {
-        return Err(truncated());
+    if let Some(size) = size {
+        if out.len() < size {
+            return Err(truncated());
+        }
+        out.truncate(size);
     }
-    out.truncate(size);
     Ok(out)
 }
 
@@ -493,6 +553,66 @@ mod tests {
         let mut comp = flate2_deflate(&data, flate2::Compression::best());
         comp.truncate(comp.len() / 2);
         assert!(inflate(&comp, data.len(), &ZIP_ORDER).is_err());
+    }
+
+    // --- NSIS deflate variant ------------------------------------------------
+
+    /// A plain dynamic block round-trips through `inflate_nsis`: it carries a
+    /// proper end-of-block symbol, so the NSIS variant reads it just like plain
+    /// deflate (the quirks only matter for streams NSIS actually produces).
+    #[test]
+    fn nsis_inflate_reads_plain_dynamic_block() {
+        let data = b"nsis deflate reads a normal stream fine".to_vec();
+        let comp = deflate_dynamic(&data, &ZIP_ORDER);
+        assert_eq!(inflate_nsis(&comp).unwrap(), data);
+    }
+
+    #[test]
+    fn nsis_inflate_reads_real_flate2_stream() {
+        let data = b"repeat me repeat me repeat me over and over. ".repeat(40);
+        let comp = flate2_deflate(&data, flate2::Compression::best());
+        assert_eq!(inflate_nsis(&comp).unwrap(), data);
+    }
+
+    /// Build an NSIS stored block: header (`lastblock`, type 0), byte align, the
+    /// 16-bit `LEN`, then the literal bytes — and, unlike plain deflate, *no*
+    /// `NLEN` complement word.
+    fn nsis_stored_block(data: &[u8], lastblock: bool) -> Vec<u8> {
+        let mut w = LsbWriter::default();
+        w.write_bit(u32::from(lastblock));
+        w.write_bits(0, 2); // type 0: stored
+        while w.nbits != 0 {
+            w.write_bit(0); // align to byte boundary
+        }
+        w.write_bits(data.len() as u32 & 0xffff, 16); // LEN, no NLEN
+        for &b in data {
+            w.write_bits(u32::from(b), 8);
+        }
+        w.finish()
+    }
+
+    #[test]
+    fn nsis_stored_block_without_complement() {
+        let data = b"stored with no NLEN complement word";
+        let comp = nsis_stored_block(data, true);
+        assert_eq!(inflate_nsis(&comp).unwrap(), data);
+        // Plain deflate must reject it: it reads the first data bytes as NLEN and
+        // the check fails (or the stream desyncs).
+        assert!(inflate(&comp, data.len(), &ZIP_ORDER).is_err());
+    }
+
+    #[test]
+    fn nsis_stops_at_input_eof_without_final_block() {
+        // A non-last stored block whose data ends exactly at input EOF — there is
+        // no following block header. The NSIS variant stops cleanly here.
+        let data = b"ends at eof, no trailing end-of-block symbol";
+        let comp = nsis_stored_block(data, false);
+        assert_eq!(inflate_nsis(&comp).unwrap(), data);
+    }
+
+    #[test]
+    fn nsis_inflate_empty_input_is_empty() {
+        assert_eq!(inflate_nsis(&[]).unwrap(), Vec::<u8>::new());
     }
 
     #[test]

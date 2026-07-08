@@ -9,6 +9,7 @@ members = [
     "crates/newtua-stuffit",
     "crates/newtua-amiga",
     "crates/newtua-alz",
+    "crates/newtua-nsis",
     "crates/newtua-testutil",
 ]
 
