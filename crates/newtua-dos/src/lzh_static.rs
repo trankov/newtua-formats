@@ -118,7 +118,7 @@ impl<R: Read> LzhStaticReader<R> {
                 }
             }
         }
-        Ok(PrefixCode::from_lengths(&lengths, 16, true))
+        PrefixCode::try_from_lengths(&lengths, 16, true)
     }
 
     /// `allocAndParseLiteralCode` — the literal/length code, whose own lengths
@@ -156,7 +156,7 @@ impl<R: Read> LzhStaticReader<R> {
                 n += 1;
             }
         }
-        Ok(PrefixCode::from_lengths(&lengths, 16, true))
+        PrefixCode::try_from_lengths(&lengths, 16, true)
     }
 }
 
@@ -174,5 +174,24 @@ impl<R: Read> Read for LzhStaticReader<R> {
         out[..n].copy_from_slice(&self.buffer[self.buffer_pos..self.buffer_pos + n]);
         self.buffer_pos += n;
         Ok(n)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A code table declaring three length-1 codes over-subscribes the alphabet
+    /// (Kraft sum > 1), so canonical assignment collides instead of yielding a
+    /// valid code. `parse_code_of_width` must report invalid data rather than
+    /// return a silently-broken code. The bytes pack (MSB-first): symbol count 3
+    /// (5 bits), three 3-bit lengths of 1, then the special-index run count of
+    /// 0 (2 bits).
+    #[test]
+    fn oversubscribed_code_lengths_error_not_panic() {
+        let corrupt = [0x19u8, 0x24];
+        let mut reader = LzhStaticReader::new(&corrupt[..], 15);
+        let err = reader.parse_code_of_width(5, 3).err().unwrap();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
     }
 }

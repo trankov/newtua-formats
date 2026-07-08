@@ -197,7 +197,7 @@ fn parse_code<R: Read>(
         .iter()
         .map(|&l| if l >= 1 { l as u32 } else { 0 })
         .collect();
-    Ok(PrefixCode::from_lengths(&lens, 32, true))
+    PrefixCode::try_from_lengths(&lens, 32, true)
 }
 
 /// Write a code length, reporting an overflow (a malformed run) as invalid data.
@@ -598,6 +598,20 @@ mod tests {
                 write_meta(w, (l - 1) as usize);
             }
         }
+    }
+
+    /// Three length-1 codes over-subscribe the alphabet (Kraft sum > 1), so
+    /// canonical assignment would run off a leaf. `parse_code` must report it as
+    /// invalid data rather than panic inside the prefix-code builder.
+    #[test]
+    fn oversubscribed_code_lengths_error_not_panic() {
+        let mut w = BitWriter::default();
+        write_length_table(&mut w, &[1, 1, 1]);
+        let bytes = w.finish();
+        let meta = build_meta_code();
+        let mut bits = BitReaderLsb::new(&bytes[..]);
+        let err = parse_code(&mut bits, 3, &meta).err().unwrap();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
     }
 
     /// Smallest `bits` with `2.pow(bits) >= n`.

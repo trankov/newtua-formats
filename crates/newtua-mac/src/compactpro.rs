@@ -589,7 +589,7 @@ impl<'a> LzhDecoder<'a> {
             lengths[2 * i] = u32::from(val >> 4);
             lengths[2 * i + 1] = u32::from(val & 0x0f);
         }
-        Ok(Some(PrefixCode::from_lengths(&lengths, 15, true)))
+        Ok(Some(PrefixCode::try_from_lengths(&lengths, 15, true)?))
     }
 
     /// Decode one symbol from `code` via the cursor, MSB first.
@@ -701,6 +701,17 @@ impl<'a> LzhDecoder<'a> {
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+
+    /// A code table of two bytes with nibbles 1,1,1,0 declares three length-1
+    /// codes: the Kraft sum exceeds 1, so canonical assignment would run off a
+    /// leaf. `parse_code` must report invalid data rather than panic.
+    #[test]
+    fn oversubscribed_code_lengths_error_not_panic() {
+        let corrupt = [0x02u8, 0x11, 0x10];
+        let mut d = LzhDecoder::new(&corrupt[..], DEFAULT_BLOCK_SIZE);
+        let err = d.parse_code(256).err().unwrap();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    }
 
     // --- a minimal MSB-first bit writer mirroring BitCursor ------------------
 
