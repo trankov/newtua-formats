@@ -10,3 +10,8 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
+
+[dev-dependencies]
+# Used only to produce real deflate fixtures (with LZ matches and a stored
+# block) for the inflate tests; never a runtime dependency.
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }

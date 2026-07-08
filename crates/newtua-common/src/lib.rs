@@ -16,6 +16,7 @@ pub mod bytes;
 pub mod compress;
 pub mod crc16;
 pub mod crc32;
+pub mod deflate;
 pub mod lzss;
 pub mod lzw;
 pub mod md5;

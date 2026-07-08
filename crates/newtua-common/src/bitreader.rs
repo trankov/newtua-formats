@@ -45,6 +45,15 @@ impl<R: Read> BitReaderLsb<R> {
         Ok(Some(bit))
     }
 
+    /// Discard the remaining bits of the current byte so the next read starts on
+    /// a byte boundary. A no-op when already aligned. Deflate's stored blocks use
+    /// this before reading their byte-aligned length words (`CSInputSkipToByteBoundary`).
+    pub fn align_to_byte(&mut self) {
+        if self.nbits % 8 != 0 {
+            self.nbits = 0;
+        }
+    }
+
     /// Read the next `n`-bit code (`n` ≤ 32), least-significant bit first: the
     /// first bit read becomes bit 0 of the result. Returns `None` once fewer
     /// than `n` bits remain (a partial code at end of input is discarded).
@@ -213,6 +222,32 @@ mod tests {
         let mut r = BitReaderLsb::new(Cursor::new(vec![0x34, 0x12]));
         assert_eq!(r.read_bits(12).unwrap(), Some(0x234));
         assert_eq!(r.read_bits(4).unwrap(), Some(0x1));
+    }
+
+    #[test]
+    fn align_to_byte_skips_partial_byte() {
+        // Read 3 bits of 0xFF, align, then reads continue from the next byte.
+        let mut r = BitReaderLsb::new(Cursor::new(vec![0xFF, 0x01]));
+        for _ in 0..3 {
+            assert_eq!(r.read_bit().unwrap(), Some(true));
+        }
+        r.align_to_byte();
+        // 0x01: bit 0 set, rest clear.
+        assert_eq!(r.read_bit().unwrap(), Some(true));
+        for _ in 0..7 {
+            assert_eq!(r.read_bit().unwrap(), Some(false));
+        }
+        assert_eq!(r.read_bit().unwrap(), None);
+    }
+
+    #[test]
+    fn align_to_byte_when_already_aligned_is_noop() {
+        // After consuming a whole byte we are aligned; align must not drop the
+        // next byte.
+        let mut r = BitReaderLsb::new(Cursor::new(vec![0xAA, 0x55]));
+        assert_eq!(r.read_bits(8).unwrap(), Some(0xAA));
+        r.align_to_byte();
+        assert_eq!(r.read_bits(8).unwrap(), Some(0x55));
     }
 
     #[test]

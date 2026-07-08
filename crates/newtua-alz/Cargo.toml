@@ -9,14 +9,17 @@ repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
-# Codec exception (see CLAUDE.md): deflate/bzip2 are explicitly out of scope to
-# re-implement, so we lean on mature pure-Rust crates rather than porting them.
+# Codec exception (see CLAUDE.md): bzip2 is explicitly out of scope to
+# re-implement, so we lean on a mature pure-Rust crate rather than porting it.
+# Deflate (methods 2 and 3) is decoded by `newtua-common::deflate`, whose
+# parameterisable meta order `flate2` cannot provide.
 [dependencies]
 newtua-common.workspace = true
-flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 bzip2-rs = "0.1"
 
 [dev-dependencies]
 newtua-testutil.workspace = true
-# C-backed bzip2, used only to *compress* fixtures for the oracle tests.
+# C-backed bzip2, used only to *compress* fixtures for the oracle tests;
+# flate2 likewise only *produces* real deflate fixtures for the tests.
 bzip2 = "0.4"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }

@@ -155,6 +155,38 @@ impl PrefixCode {
         out
     }
 
+    /// Like [`from_lengths`](Self::from_lengths), but returns an error instead of
+    /// panicking when `lengths` are invalid: over-subscribed (they violate the
+    /// Kraft inequality `sum(2^(max-len)) <= 2^max`, so canonical assignment
+    /// would run off the end of a leaf) or longer than `max_length`. Use this for
+    /// lengths read from an untrusted stream; the infallible `from_lengths` is
+    /// for provably-valid constant tables. An incomplete code (Kraft sum `< 1`,
+    /// e.g. deflate's lone dummy distance code) is accepted.
+    pub fn try_from_lengths(
+        lengths: &[u32],
+        max_length: u32,
+        shortest_code_is_zeros: bool,
+    ) -> io::Result<Self> {
+        let mut total: u64 = 0;
+        for &len in lengths {
+            if len == 0 {
+                continue;
+            }
+            if len > max_length {
+                return Err(invalid("prefix code: code length exceeds maximum"));
+            }
+            total += 1u64 << (max_length - len);
+        }
+        if total > (1u64 << max_length) {
+            return Err(invalid("prefix code: over-subscribed code lengths"));
+        }
+        Ok(Self::from_lengths(
+            lengths,
+            max_length,
+            shortest_code_is_zeros,
+        ))
+    }
+
     /// Add one code for `value`, given as `length` bits with the
     /// least-significant bit consumed first (the order [`next_symbol_le`]
     /// reads). Used for statically-defined code tables.
@@ -329,6 +361,32 @@ mod tests {
         (0..count)
             .map(|_| code.next_symbol_msb(&mut bits).unwrap().unwrap())
             .collect()
+    }
+
+    #[test]
+    fn try_from_lengths_accepts_valid_lengths() {
+        // Same canonical code as `from_lengths`, but via the checked constructor.
+        let code = PrefixCode::try_from_lengths(&[1, 2, 3, 3], 15, true).unwrap();
+        assert_eq!(decode_n_msb(&code, &[0x5B, 0x80], 4), vec![0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn try_from_lengths_accepts_incomplete_code() {
+        // A single 1-bit code is incomplete (Kraft sum < 1) but valid — deflate's
+        // lone dummy distance code relies on this being accepted, not rejected.
+        assert!(PrefixCode::try_from_lengths(&[1], 15, true).is_ok());
+    }
+
+    #[test]
+    fn try_from_lengths_rejects_over_subscribed_code() {
+        // Three 1-bit codes cannot coexist (Kraft sum 3/2 > 1); `from_lengths`
+        // would walk past a leaf and panic, so the checked form must error.
+        assert!(PrefixCode::try_from_lengths(&[1, 1, 1], 15, true).is_err());
+    }
+
+    #[test]
+    fn try_from_lengths_rejects_length_over_max() {
+        assert!(PrefixCode::try_from_lengths(&[2], 1, true).is_err());
     }
 
     #[test]

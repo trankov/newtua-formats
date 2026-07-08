@@ -11,17 +11,18 @@
 //! block follows: method byte, a skipped byte, the IEEE CRC-32 of the
 //! decompressed data, then the compressed and uncompressed sizes.
 //!
-//! Supported compression methods: 0 stored, 1 bzip2, 2 raw deflate. Method 3
-//! (obfuscated deflate), encrypted members, and multi-volume sets are reported
-//! as [`io::ErrorKind::Unsupported`].
+//! Supported compression methods: 0 stored, 1 bzip2, 2 raw deflate, and 3
+//! obfuscated deflate (the same deflate stream, but with the code-length
+//! meta-table read in a size-derived order). Encrypted members and multi-volume
+//! sets are reported as [`io::ErrorKind::Unsupported`].
 
 #![forbid(unsafe_code)]
 
 use std::io::{self, Read, Write};
 
 use bzip2_rs::DecoderReader as Bzip2Reader;
-use flate2::read::DeflateDecoder;
 use newtua_common::crc32::crc32_ieee;
+use newtua_common::deflate;
 
 fn invalid(msg: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, msg.into())
@@ -29,6 +30,27 @@ fn invalid(msg: impl Into<String>) -> io::Error {
 
 fn unsupported(msg: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::Unsupported, msg.into())
+}
+
+/// The deflate meta-table order for method 3, derived from `param` (the
+/// uncompressed size modulo 16). A faithful port of `CalculateSillyTable`
+/// (`XADALZipParser.m`), including its quirks: the swap index wraps modulo 18
+/// (not 19), and a swap onto the same slot is skipped.
+fn silly_meta_order(param: usize) -> [u8; 19] {
+    let mut table = [0u8; 19];
+    for (i, v) in table.iter_mut().enumerate() {
+        *v = i as u8;
+    }
+    for i in 0..19 {
+        let mut swapindex = (i % 6) * 3 + param;
+        if swapindex > 18 {
+            swapindex %= 18;
+        }
+        if swapindex != i {
+            table.swap(i, swapindex);
+        }
+    }
+    table
 }
 
 /// One member of an ALZip archive.
@@ -118,12 +140,10 @@ impl AlzArchive {
         let decoded = match e.method {
             0 => comp.to_vec(),
             1 => read_n(Bzip2Reader::new(comp), size)?,
-            2 => read_n(DeflateDecoder::new(comp), size)?,
-            3 => {
-                return Err(unsupported(
-                    "alz: obfuscated deflate (method 3) is not supported",
-                ))
-            }
+            // Method 2 is plain deflate; method 3 is the same stream with a
+            // size-obfuscated meta-table order (`CalculateSillyTable`).
+            2 => deflate::inflate(comp, size, &deflate::ZIP_ORDER)?,
+            3 => deflate::inflate(comp, size, &silly_meta_order(size % 16))?,
             other => return Err(unsupported(format!("alz: unsupported method {other}"))),
         };
 
@@ -498,12 +518,66 @@ mod tests {
         assert!(read(&arc, 0).is_err());
     }
 
+    /// Build a method-3 (obfuscated deflate) fixture: the deflate stream is
+    /// written in the size-derived meta order the decoder must reconstruct.
+    fn method_3_comp(content: &[u8]) -> Vec<u8> {
+        newtua_common::deflate::deflate_dynamic(content, &silly_meta_order(content.len() % 16))
+    }
+
     #[test]
-    fn method_3_is_unsupported() {
-        let a = archive(&[file_record(b"o", 3, 0, b"....", 4, 4)]);
+    fn decodes_method_3() {
+        let content = b"obfuscated deflate, method 3, over and over. ".repeat(4);
+        let comp = method_3_comp(&content);
+        let a = archive(&[file_record(
+            b"m3.bin",
+            3,
+            crc32_ieee(&content),
+            &comp,
+            content.len() as u64,
+            4,
+        )]);
         let arc = AlzArchive::open(&a[..]).unwrap();
-        let err = read(&arc, 0).unwrap_err();
-        assert_eq!(err.kind(), io::ErrorKind::Unsupported);
+        assert_eq!(read(&arc, 0).unwrap(), content);
+    }
+
+    #[test]
+    fn decodes_method_3_various_sizes() {
+        // The meta order depends on size % 16, so cover a spread of residues.
+        for extra in 0..16usize {
+            let content: Vec<u8> = (0..extra).map(|i| b'A' + (i % 20) as u8).collect();
+            let comp = method_3_comp(&content);
+            let a = archive(&[file_record(
+                b"s",
+                3,
+                crc32_ieee(&content),
+                &comp,
+                content.len() as u64,
+                4,
+            )]);
+            let arc = AlzArchive::open(&a[..]).unwrap();
+            assert_eq!(
+                read(&arc, 0).unwrap(),
+                content,
+                "len % 16 == {}",
+                extra % 16
+            );
+        }
+    }
+
+    #[test]
+    fn method_3_crc_mismatch_errors() {
+        let content = b"method 3 payload with a wrong checksum".to_vec();
+        let comp = method_3_comp(&content);
+        let a = archive(&[file_record(
+            b"bad",
+            3,
+            0xDEAD_BEEF,
+            &comp,
+            content.len() as u64,
+            4,
+        )]);
+        let arc = AlzArchive::open(&a[..]).unwrap();
+        assert!(read(&arc, 0).is_err());
     }
 
     #[test]
