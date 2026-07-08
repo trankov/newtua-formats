@@ -152,3 +152,15 @@ fn nonsolid_deflate_matches_unar() {
     // `newtua-common::deflate::inflate_nsis`.
     assert_matches_unar("nonsolid-deflate", "zlib");
 }
+
+#[test]
+fn solid_bzip2_matches_unar() {
+    // Solid bzip2 is reached only via the solid probe (`XADNSISParser.m:322-329`).
+    assert_matches_unar("solid-bzip2", "/SOLID bzip2");
+}
+
+#[test]
+fn nonsolid_bzip2_matches_unar() {
+    // Non-solid bzip2 auto-detects as the NSIS2 (no-randomization) variant.
+    assert_matches_unar("nonsolid-bzip2", "bzip2");
+}

@@ -2,23 +2,30 @@
 //!
 //! NSIS sniffs the compression method from the first bytes of the data area
 //! (`XADNSISParser.m` `LooksLike*` and the format constants `:9-15,:51-69`).
-//! For task 20a we decode **LZMA** (raw LZMA1, five property bytes, no size
-//! field — via the mature `lzma-rs` crate) and **NSIS-deflate** (via
-//! `newtua-common::deflate::inflate_nsis`). The filtered-LZMA (BCJ+LZMA) and
-//! custom NSIS-bzip2 branches are recognised but deferred to task 20b, and the
-//! legacy zlib branch is out of scope; all three surface as `Unsupported`.
+//! We decode all four NSIS methods: **LZMA** (raw LZMA1, five property bytes, no
+//! size field — via the mature `lzma-rs` crate), **NSIS-deflate** (via
+//! `newtua-common::deflate::inflate_nsis`), the custom **NSIS-bzip2** (both the
+//! NSIS2 and randomized NSIS1 variants, [`crate::bzip2`]) and **FilteredLZMA**
+//! (a one-byte filter selector plus LZMA, with the x86 BCJ filter in
+//! [`crate::bcj`]). The legacy zlib branch is out of scope and surfaces as
+//! `Unsupported`, as does an unknown LZMA filter byte.
 
 use std::io::{self, Cursor};
 
 use newtua_common::deflate;
 
-use crate::{invalid, unsupported};
+use crate::{bcj, bzip2, invalid, unsupported};
 
 /// The compression method backing an NSIS archive's data area.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Codec {
     /// Raw LZMA1: five property bytes, an end-of-stream marker, no size field.
     Lzma,
+    /// LZMA preceded by a one-byte filter selector; filter `1` is the x86 BCJ
+    /// branch filter (`XADNSISParser.m:1190-1202`).
+    FilteredLzma,
+    /// The custom NSIS bzip2. `hasrand` marks the NSIS1 (v1.9x) randomized variant.
+    NsisBzip2 { hasrand: bool },
     /// NSIS's modified deflate (`XADNSISDeflateVariant`).
     NsisDeflate,
 }
@@ -53,13 +60,11 @@ pub fn sniff(sig: &[u8]) -> io::Result<Codec> {
     if looks_like_lzma(sig) {
         Ok(Codec::Lzma)
     } else if looks_like_filtered_lzma(sig) {
-        Err(unsupported(
-            "nsis: filtered LZMA (BCJ+LZMA) is deferred to task 20b",
-        ))
+        Ok(Codec::FilteredLzma)
     } else if looks_like_nsis_bzip2(sig) {
-        Err(unsupported(
-            "nsis: custom NSIS bzip2 is deferred to task 20b",
-        ))
+        // Auto-detection only recognises the NSIS2 (non-randomized) variant; the
+        // randomized NSIS1 form is reached solely by the solid probe (`:1153`).
+        Ok(Codec::NsisBzip2 { hasrand: false })
     } else if looks_like_zlib(sig) {
         Err(unsupported("nsis: legacy zlib format is out of scope"))
     } else {
@@ -73,8 +78,34 @@ pub fn sniff(sig: &[u8]) -> io::Result<Codec> {
 pub fn decode(codec: Codec, data: &[u8]) -> io::Result<Vec<u8>> {
     match codec {
         Codec::Lzma => decode_lzma_raw(data),
+        Codec::FilteredLzma => decode_filtered_lzma(data),
+        Codec::NsisBzip2 { hasrand } => bzip2::decode(data, hasrand),
         Codec::NsisDeflate => deflate::inflate_nsis(data),
     }
+}
+
+/// Decode FilteredLZMA: a one-byte filter selector, then a raw LZMA stream whose
+/// decoded output the filter is applied to (`XADNSISParser.m:1190-1202`). Filter
+/// `0` is plain LZMA; filter `1` is the x86 BCJ branch filter (applied in one
+/// pass, `ip = 0`); any other value is unsupported.
+fn decode_filtered_lzma(data: &[u8]) -> io::Result<Vec<u8>> {
+    let filter = *data
+        .first()
+        .ok_or_else(|| invalid("nsis: empty filtered-LZMA stream"))?;
+    // Validate the filter before decoding (the reference decides the filter at
+    // `:1190-1202` before building the handle): an unknown filter is rejected
+    // without paying for a full LZMA decompression.
+    if filter > 1 {
+        return Err(unsupported(format!(
+            "nsis: unsupported LZMA filter {filter}"
+        )));
+    }
+    let mut out = decode_lzma_raw(&data[1..])?;
+    if filter == 1 {
+        let mut state = 0u32;
+        bcj::x86_convert(&mut out, 0, &mut state, false);
+    }
+    Ok(out)
 }
 
 /// Decode raw LZMA1 as NSIS stores it: five property bytes, then the LZMA
@@ -166,15 +197,57 @@ mod tests {
     }
 
     #[test]
-    fn sniff_filtered_lzma_is_unsupported() {
-        let e = sniff(&[0x00, 0x5d, 0, 0, 0x00, 0x10, 0]).unwrap_err();
-        assert_eq!(e.kind(), io::ErrorKind::Unsupported);
+    fn sniff_detects_filtered_lzma() {
+        assert_eq!(
+            sniff(&[0x00, 0x5d, 0, 0, 0x00, 0x10, 0]).unwrap(),
+            Codec::FilteredLzma
+        );
     }
 
     #[test]
-    fn sniff_nsis_bzip2_is_unsupported() {
-        // '1' followed by a 24-bit block size < 900000.
-        let e = sniff(&[b'1', 0x00, 0x00, 0x10, 0, 0, 0]).unwrap_err();
+    fn sniff_detects_nsis_bzip2() {
+        // '1' followed by a 24-bit block size < 900000; auto-detect is always the
+        // non-randomized NSIS2 variant.
+        assert_eq!(
+            sniff(&[b'1', 0x00, 0x00, 0x10, 0, 0, 0]).unwrap(),
+            Codec::NsisBzip2 { hasrand: false }
+        );
+    }
+
+    #[test]
+    fn filtered_lzma_bcj_round_trips() {
+        // Payload with x86 branches: BCJ-encode, LZMA-compress, prefix filter `1`.
+        let mut payload: Vec<u8> = Vec::new();
+        for i in 0..300u32 {
+            if i % 5 == 0 {
+                payload.push(0xE8);
+                payload.extend_from_slice(&(i * 0x0101).to_le_bytes());
+            } else {
+                payload.push((i & 0xff) as u8);
+            }
+        }
+        payload.extend_from_slice(&[0u8; 8]); // complete the last instruction
+        let mut encoded = payload.clone();
+        let mut s = 0u32;
+        bcj::x86_convert(&mut encoded, 0, &mut s, true);
+        let mut stream = vec![1u8];
+        stream.extend_from_slice(&lzma_encode_raw(&encoded));
+        assert_eq!(decode(Codec::FilteredLzma, &stream).unwrap(), payload);
+    }
+
+    #[test]
+    fn filtered_lzma_filter_zero_is_plain_lzma() {
+        let payload = b"filter 0 means the LZMA output passes through untouched".repeat(4);
+        let mut stream = vec![0u8];
+        stream.extend_from_slice(&lzma_encode_raw(&payload));
+        assert_eq!(decode(Codec::FilteredLzma, &stream).unwrap(), payload);
+    }
+
+    #[test]
+    fn filtered_lzma_unknown_filter_is_unsupported() {
+        let mut stream = vec![2u8];
+        stream.extend_from_slice(&lzma_encode_raw(b"x"));
+        let e = decode(Codec::FilteredLzma, &stream).unwrap_err();
         assert_eq!(e.kind(), io::ErrorKind::Unsupported);
     }
 

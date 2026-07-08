@@ -9,10 +9,11 @@
 //! branches (which guess opcode strides statistically) are intentionally not
 //! ported and surface as [`io::ErrorKind::Unsupported`].
 //!
-//! Supported payload codecs (task 20a): **solid and non-solid LZMA** (the modern
-//! default) and **NSIS-deflate**. The custom NSIS-bzip2 and BCJ+LZMA (filtered)
-//! methods are recognised but deferred to task 20b, and the legacy zlib format
-//! is out of scope; all three yield `Unsupported` rather than corrupt output.
+//! Supported payload codecs, solid and non-solid: **LZMA** (the modern default),
+//! **NSIS-deflate**, the custom **NSIS-bzip2** (both the NSIS2 and the randomized
+//! NSIS1 variants) and **FilteredLZMA** (a filter selector plus LZMA, including
+//! the x86 BCJ branch filter). Only the legacy zlib format is out of scope and
+//! yields `Unsupported` rather than corrupt output.
 //!
 //! The public API is charset-agnostic: entry names are raw bytes with `/`
 //! separators (ANSI names are left in their original codepage; UTF-16 Unicode
@@ -24,6 +25,8 @@
 use std::collections::BTreeMap;
 use std::io::{self, Read, Write};
 
+mod bcj;
+mod bzip2;
 mod codec;
 mod paths;
 
@@ -219,16 +222,20 @@ fn parse(data: Vec<u8>, fh_off: usize) -> io::Result<(Vec<NsisEntry>, Reader)> {
     let sniffed = codec::sniff(sig);
 
     // Solid attempt (`attemptSolidHandleAtPosition:`, `:1209-1224`): decode the
-    // whole stream; if its first u32 is the header length, the guess is right.
-    let mut solid: Option<Vec<u8>> = None;
-    if let Ok(Codec::Lzma) = sniffed {
-        solid = try_solid(Codec::Lzma, region, headerlength);
-    }
-    if solid.is_none() {
-        solid = try_solid(Codec::NsisDeflate, region, headerlength);
-    }
-    if let Some(stream) = solid {
-        return build_solid(stream, headerlength);
+    // whole stream with each candidate codec; if its first u32 is the header
+    // length, the guess is right. The order mirrors the reference (`:322-329`) —
+    // it is here that the randomized NSIS1 bzip2 variant is reached.
+    let candidates = [
+        Codec::Lzma,
+        Codec::FilteredLzma,
+        Codec::NsisBzip2 { hasrand: false },
+        Codec::NsisBzip2 { hasrand: true },
+        Codec::NsisDeflate,
+    ];
+    for codec in candidates {
+        if let Some(stream) = try_solid(codec, region, headerlength) {
+            return build_solid(stream, headerlength);
+        }
     }
 
     // Non-solid: the header is the first block, the rest follow after it.

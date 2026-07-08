@@ -376,19 +376,8 @@ fn firstheader_with_data(headerlength: u32, data: &[u8]) -> Vec<u8> {
     file
 }
 
-#[test]
-fn nsis_bzip2_signature_is_unsupported() {
-    let file = firstheader_with_data(100, &[b'1', 0x00, 0x00, 0x10, 0, 0, 0]);
-    let err = open_err(&file);
-    assert_eq!(err.kind(), io::ErrorKind::Unsupported);
-}
-
-#[test]
-fn filtered_lzma_signature_is_unsupported() {
-    let file = firstheader_with_data(100, &[0x01, 0x5d, 0x00, 0x00, 0x00, 0x10, 0x00]);
-    let err = open_err(&file);
-    assert_eq!(err.kind(), io::ErrorKind::Unsupported);
-}
+// NSIS-bzip2 and FilteredLZMA are now decoded (task 20b); their real cross-checks
+// live in `tests/oracle.rs` (bzip2) and `codec.rs` (FilteredLZMA round-trip).
 
 #[test]
 fn zlib_signature_is_unsupported() {
