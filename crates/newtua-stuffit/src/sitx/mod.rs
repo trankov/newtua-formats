@@ -14,6 +14,7 @@
 //! decoder.
 
 mod bwt;
+mod cyanide;
 mod p2;
 mod rangecoder;
 mod x86;
@@ -182,11 +183,7 @@ fn decode_stream(data: &[u8], desc: &StreamDescriptor, want_checksum: bool) -> i
                 "sitx: Brimstone/PPMd compression is not yet supported",
             ))
         }
-        1 => {
-            return Err(unsupported(
-                "sitx: Cyanide compression is not yet supported",
-            ))
-        }
+        1 => cyanide::decode(&blocks, size)?,
         2 => {
             return Err(unsupported(
                 "sitx: Darkhorse compression is not yet supported",

@@ -39,6 +39,12 @@ impl<'a> RangeCoder<'a> {
         coder
     }
 
+    /// Number of input bytes consumed so far (init read + renormalization),
+    /// so a block-framed caller can advance its cursor to the next block header.
+    pub(crate) fn position(&self) -> usize {
+        self.pos
+    }
+
     /// `CSInputNextByte`: past-EOF reads return zero rather than failing —
     /// the reference decoder trusts the block length to stop it in time.
     fn next_byte(&mut self) -> u8 {
@@ -572,6 +578,40 @@ mod tests {
 
         assert_eq!(decoded, bits);
         assert_eq!((d1, d2), (expected_w1, expected_w2));
+    }
+
+    #[test]
+    fn position_starts_at_four_after_the_initial_code_read() {
+        let bytes = [0u8; 8];
+        let dec = RangeCoder::new(&bytes, true, 0);
+        assert_eq!(
+            dec.position(),
+            4,
+            "new() reads exactly the leading code word"
+        );
+    }
+
+    #[test]
+    fn position_advances_monotonically_as_symbols_are_decoded() {
+        let freqs = [1u32, 1, 1, 1];
+        let symbols = [0usize, 1, 2, 3, 0, 1, 2, 3];
+
+        let mut enc = CarrylessEncoder::new(0);
+        for &s in &symbols {
+            enc.encode_symbol(&freqs, s);
+        }
+        let bytes = enc.finish();
+
+        let mut dec = RangeCoder::new(&bytes, true, 0);
+        let mut last = dec.position();
+        assert_eq!(last, 4);
+        for &s in &symbols {
+            assert_eq!(dec.next_symbol(&freqs), s);
+            let now = dec.position();
+            assert!(now >= last, "position must never move backwards");
+            last = now;
+        }
+        assert!(last > 4, "decoding several symbols must consume more input");
     }
 
     #[test]

@@ -536,19 +536,19 @@ fn resource_and_data_forks_both_extract() {
 
 #[test]
 fn unsupported_codec_parses_but_read_fails() {
-    // Cyanide (method 1) is not yet supported: the archive parses (metadata is
-    // available) but reading the fork returns Unsupported.
+    // Darkhorse (method 2) is not yet supported (19d): the archive parses
+    // (metadata is available) but reading the fork returns Unsupported.
     let content = vec![0u8; 8];
     let data = archive(|w| {
         write_file(w, 1, None);
         write_fork(w, 1, 1, 0, content.len() as u64, 0);
         write_catalog(w, &build_catalog(&[b"c.bin"]));
-        write_data(w, 1, content.len() as u64, &[(1, 1)], &content, None);
+        write_data(w, 1, content.len() as u64, &[(1, 2)], &content, None);
         write_end(w);
     });
     let arc = SitxArchive::open(data).unwrap();
     assert_eq!(arc.entries()[0].name(), b"c.bin");
-    assert_eq!(arc.entries()[0].compression_name(), "Cyanide");
+    assert_eq!(arc.entries()[0].compression_name(), "Darkhorse");
     let mut buf = Vec::new();
     let err = arc.read_entry(0, &mut buf).unwrap_err();
     assert_eq!(err.kind(), std::io::ErrorKind::Unsupported);
@@ -702,4 +702,77 @@ fn corpus_files_match_unar() {
         "corpus: {checked} archives verified, {skipped_unsupported} skipped (unsupported codecs), \
 		 {skipped_unar_cant} skipped (unar cannot parse)"
     );
+}
+
+/// Like `corpus_files_match_unar`, but counts and cross-checks Cyanide
+/// (compression method 1) members specifically, matching the per-codec table
+/// 19a's corpus survey used (`report-19a-sitx-container.md`, "Обзор методов
+/// корпуса"). Member selection uses our own parser's `compression_name()`
+/// (already exercised by 19a for unsupported codecs) rather than shelling out
+/// to `lsar -j` a second time.
+#[test]
+fn cyanide_corpus_members_match_unar() {
+    let Some(dir) = newtua_testutil::sitx_corpus_dir() else {
+        eprintln!("skipping: NEWTUA_SITX_CORPUS not set");
+        return;
+    };
+    if !newtua_testutil::unar_installed() {
+        eprintln!("skipping: unar not installed");
+        return;
+    }
+
+    let mut members_checked = 0usize;
+    let mut members_mismatched = 0usize;
+    let mut archives_unar_cant = 0usize;
+    for entry in std::fs::read_dir(&dir).unwrap() {
+        let path = entry.unwrap().path();
+        if !path.is_file() {
+            continue;
+        }
+        let bytes = std::fs::read(&path).unwrap();
+        if !SitxArchive::recognize(&bytes) {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+
+        let arc = match SitxArchive::open(bytes.clone()) {
+            Ok(a) => a,
+            Err(_) => continue, // not a Cyanide-relevant failure; the general oracle covers this
+        };
+        let has_cyanide = arc
+            .entries()
+            .iter()
+            .any(|e| e.compression_name().starts_with("Cyanide"));
+        if !has_cyanide {
+            continue;
+        }
+
+        let Some(theirs) = newtua_testutil::try_unar_extract_all(&bytes, &name) else {
+            archives_unar_cant += 1;
+            continue;
+        };
+
+        for (i, en) in arc.entries().iter().enumerate() {
+            if en.is_directory() || !en.compression_name().starts_with("Cyanide") {
+                continue;
+            }
+            let mut buf = Vec::new();
+            arc.read_entry(i, &mut buf)
+                .unwrap_or_else(|e| panic!("Cyanide member in {name} failed to decode: {e}"));
+            let mut key = String::from_utf8_lossy(en.name()).into_owned();
+            if en.is_resource_fork() {
+                key.push_str("/..namedfork/rsrc");
+            }
+            members_checked += 1;
+            if theirs.get(&key) != Some(&buf) {
+                members_mismatched += 1;
+                eprintln!("cyanide mismatch: {name}:{key}");
+            }
+        }
+    }
+    eprintln!(
+        "cyanide corpus: {members_checked} members checked, {members_mismatched} mismatched, \
+		 {archives_unar_cant} archives unar could not parse"
+    );
+    assert_eq!(members_mismatched, 0, "Cyanide output diverged from unar");
 }
