@@ -24,10 +24,10 @@ Done formats are listed plainly; still-queued ones are marked *(planned)*.
 | `newtua-common` | shared primitives: LSB/MSB bit readers, Huffman/prefix codes, LZSS window, generic LZW, Unix-compress LZW, StuffIt Huffman, deflate, RLE90, CRC-16 (ARC + CCITT), CRC-32, MD5, RC4, ZipCrypto |
 | `newtua-dos` | Squeeze, ARC, LBR, Crunch, Zoo, ARJ |
 | `newtua-mac` | BinHex, MacBinary/AppleSingle/AppleDouble, Compact Pro, PackIt *(DiskDoubler, NowCompress planned)* |
-| `newtua-stuffit` | StuffIt classic, StuffIt 5 *(StuffItX planned)* |
-| `newtua-amiga` | PowerPacker, Amiga LZX *(DMS planned)* |
+| `newtua-stuffit` | StuffIt classic, StuffIt 5, StuffItX |
+| `newtua-amiga` | PowerPacker, Amiga LZX, DMS |
 | `newtua-alz` | ALZip |
-| `newtua-nsis` *(planned)* | NSIS |
+| `newtua-nsis` | NSIS |
 | `newtua-testutil` | shared test helpers (not published) |
 
 Implementation order and status are tracked in

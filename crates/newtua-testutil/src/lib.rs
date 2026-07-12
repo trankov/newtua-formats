@@ -68,6 +68,35 @@ fn run_unar(archive_bytes: &[u8], archive_name: &str, extra_args: &[&str]) -> (P
     (dir, archive)
 }
 
+/// Non-panicking sibling of [`run_unar`]: runs `unar` and returns the output
+/// dir + archive path on success, or `None` (cleaning up the dir) on failure —
+/// for oracle checks that must inspect a deliberate `unar` failure (wrong
+/// password, or a known `unar` limitation) rather than treat it as our bug.
+fn try_run_unar(
+    archive_bytes: &[u8],
+    archive_name: &str,
+    extra_args: &[&str],
+) -> Option<(PathBuf, PathBuf)> {
+    let dir = unique_dir(archive_name);
+    let archive = dir.join(archive_name);
+    fs::write(&archive, archive_bytes).unwrap();
+
+    let status = Command::new("unar")
+        .args(["-quiet", "-force-overwrite"])
+        .args(extra_args)
+        .arg("-output-directory")
+        .arg(&dir)
+        .arg(&archive)
+        .status()
+        .expect("run unar");
+    if status.success() {
+        Some((dir, archive))
+    } else {
+        let _ = fs::remove_dir_all(&dir);
+        None
+    }
+}
+
 /// Extract a **single-file** archive with `unar` and return the decoded bytes.
 ///
 /// `archive_name` is the on-disk filename (e.g. `"a.sq"`); `unar` names the
@@ -95,6 +124,45 @@ pub fn unar_extract_all(archive_bytes: &[u8], archive_name: &str) -> BTreeMap<St
     map
 }
 
+/// Like [`unar_extract_all`], but passes `-password <password>` so `unar` can
+/// decrypt an encrypted archive (DMS, ZIP, ALZip, …). Panics if `unar` fails —
+/// call only after [`unar_installed`].
+pub fn unar_extract_all_with_password(
+    archive_bytes: &[u8],
+    archive_name: &str,
+    password: &str,
+) -> BTreeMap<String, Vec<u8>> {
+    let (dir, archive) = run_unar(
+        archive_bytes,
+        archive_name,
+        &["-no-directory", "-password", password],
+    );
+    let mut map = BTreeMap::new();
+    collect(&dir, &dir, &archive, &mut map);
+    let _ = fs::remove_dir_all(&dir);
+    map
+}
+
+/// Like [`unar_extract_all_with_password`], but returns `None` when `unar`
+/// fails instead of panicking — for oracle checks that need to inspect a
+/// deliberate `unar` failure (wrong password, or a known `unar` limitation)
+/// rather than treat it as this crate's bug.
+pub fn try_unar_extract_all_with_password(
+    archive_bytes: &[u8],
+    archive_name: &str,
+    password: &str,
+) -> Option<BTreeMap<String, Vec<u8>>> {
+    let (dir, archive) = try_run_unar(
+        archive_bytes,
+        archive_name,
+        &["-no-directory", "-password", password],
+    )?;
+    let mut map = BTreeMap::new();
+    collect(&dir, &dir, &archive, &mut map);
+    let _ = fs::remove_dir_all(&dir);
+    Some(map)
+}
+
 /// Like [`unar_extract_all`], but returns `None` when `unar` itself fails to
 /// parse the archive instead of panicking. Used by corpus oracles to skip
 /// archives the reference decoder cannot handle either (rather than treating
@@ -103,26 +171,11 @@ pub fn try_unar_extract_all(
     archive_bytes: &[u8],
     archive_name: &str,
 ) -> Option<BTreeMap<String, Vec<u8>>> {
-    let dir = unique_dir(archive_name);
-    let archive = dir.join(archive_name);
-    fs::write(&archive, archive_bytes).unwrap();
-
-    let status = Command::new("unar")
-        .args(["-quiet", "-force-overwrite", "-no-directory"])
-        .arg("-output-directory")
-        .arg(&dir)
-        .arg(&archive)
-        .status()
-        .expect("run unar");
-    let result = if status.success() {
-        let mut map = BTreeMap::new();
-        collect(&dir, &dir, &archive, &mut map);
-        Some(map)
-    } else {
-        None
-    };
+    let (dir, archive) = try_run_unar(archive_bytes, archive_name, &["-no-directory"])?;
+    let mut map = BTreeMap::new();
+    collect(&dir, &dir, &archive, &mut map);
     let _ = fs::remove_dir_all(&dir);
-    result
+    Some(map)
 }
 
 /// Extract a **split** (multi-volume) archive with `unar`. The `volumes` are
@@ -191,6 +244,48 @@ impl BitWriter {
     /// Flush any partial final byte and return the written bytes.
     pub fn finish(mut self) -> Vec<u8> {
         if self.nbits > 0 {
+            self.bytes.push(self.cur);
+        }
+        self.bytes
+    }
+}
+
+/// A most-significant-bit-first bit writer, symmetric to
+/// `newtua_common::bitreader::BitReaderMsb`. Used by test-only encoders that
+/// build fixtures for MSB-first formats (DMS's QUICK/MEDIUM/DEEP/HEAVY).
+#[derive(Default)]
+pub struct BitWriterMsb {
+    bytes: Vec<u8>,
+    cur: u8,
+    nbits: u8,
+}
+
+impl BitWriterMsb {
+    /// Append a single bit.
+    pub fn bit(&mut self, b: bool) {
+        self.cur = (self.cur << 1) | u8::from(b);
+        self.nbits += 1;
+        if self.nbits == 8 {
+            self.bytes.push(self.cur);
+            self.cur = 0;
+            self.nbits = 0;
+        }
+    }
+
+    /// Append the low `n` bits of `val`, most-significant bit first (the bit
+    /// order `BitReaderMsb::read` reassembles).
+    pub fn bits(&mut self, val: u32, n: u32) {
+        for i in (0..n).rev() {
+            self.bit((val >> i) & 1 != 0);
+        }
+    }
+
+    /// Flush any partial final byte (padded with zero low-order bits, as a
+    /// real MSB bitstream reader would see past-EOF) and return the written
+    /// bytes.
+    pub fn finish(mut self) -> Vec<u8> {
+        if self.nbits > 0 {
+            self.cur <<= 8 - self.nbits;
             self.bytes.push(self.cur);
         }
         self.bytes

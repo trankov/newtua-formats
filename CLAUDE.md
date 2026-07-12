@@ -36,7 +36,7 @@ is usable standalone by the wider community.
   plus its compression methods: `newtua-dos` (Squeeze, ARC, LBR, Crunch, Zoo, ARJ),
   `newtua-mac` (BinHex, MacBinary/AppleSingle/AppleDouble, Compact Pro, PackIt),
   `newtua-stuffit` (StuffIt classic + StuffIt 5 + StuffItX), `newtua-amiga`
-  (PowerPacker, Amiga LZX), `newtua-nsis` (NSIS installer), `newtua-alz` (ALZip).
+  (PowerPacker, Amiga LZX, DMS), `newtua-nsis` (NSIS installer), `newtua-alz` (ALZip).
   `newtua-testutil` holds shared test helpers. Some family crates still have
   queued formats (see the roadmap). Add a new family crate to the workspace
   `members` when its first

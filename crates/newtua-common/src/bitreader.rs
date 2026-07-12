@@ -107,6 +107,35 @@ impl<R: Read> BitReaderMsb<R> {
         let mask = (1u32 << n) - 1;
         Ok(Some((self.acc >> self.nbits) & mask))
     }
+
+    /// Peek the next `n`-bit code (`n` ≤ 24), most-significant bit first,
+    /// without consuming it — refills as needed but leaves the bits
+    /// available for a later [`peek`](Self::peek) or [`consume`](Self::consume).
+    /// Returns `None` once fewer than `n` bits remain. Formats whose codes
+    /// are looked up in a table before the decoder knows how many bits the
+    /// resolved code actually used (e.g. DMS HEAVY's canonical Huffman
+    /// tables) peek the table's full index width, then
+    /// [`consume`](Self::consume) only the resolved code's real length.
+    pub fn peek(&mut self, n: u8) -> io::Result<Option<u32>> {
+        while self.nbits < n {
+            match crate::read_one_byte(&mut self.inner)? {
+                Some(b) => {
+                    self.acc = (self.acc << 8) | u32::from(b);
+                    self.nbits += 8;
+                }
+                None => return Ok(None),
+            }
+        }
+        let mask = (1u32 << n) - 1;
+        Ok(Some((self.acc >> (self.nbits - n)) & mask))
+    }
+
+    /// Drop `n` bits already made available by a prior
+    /// [`peek`](Self::peek) (which may have peeked more than `n`). The
+    /// caller is responsible for having peeked at least `n` bits first.
+    pub fn consume(&mut self, n: u8) {
+        self.nbits -= n;
+    }
 }
 
 #[cfg(test)]
@@ -286,5 +315,63 @@ mod tests {
     fn msb_empty_input_is_none() {
         let mut r = BitReaderMsb::new(Cursor::new(Vec::new()));
         assert_eq!(r.read(12).unwrap(), None);
+    }
+
+    #[test]
+    fn peek_does_not_advance() {
+        let mut r = BitReaderMsb::new(Cursor::new(vec![0xAB, 0xCD]));
+        assert_eq!(r.peek(8).unwrap(), Some(0xAB));
+        assert_eq!(
+            r.peek(8).unwrap(),
+            Some(0xAB),
+            "a second peek sees the same bits"
+        );
+    }
+
+    #[test]
+    fn peek_then_consume_matches_read() {
+        // peek(12) followed by consume(12) must see the same 12-bit codes,
+        // in the same order, as two plain read(12) calls.
+        let mut peeked = BitReaderMsb::new(Cursor::new(vec![0xAB, 0xCD, 0xEF]));
+        let a = peeked.peek(12).unwrap().unwrap();
+        peeked.consume(12);
+        let b = peeked.peek(12).unwrap().unwrap();
+        peeked.consume(12);
+
+        let mut read = BitReaderMsb::new(Cursor::new(vec![0xAB, 0xCD, 0xEF]));
+        assert_eq!(read.read(12).unwrap(), Some(a));
+        assert_eq!(read.read(12).unwrap(), Some(b));
+    }
+
+    #[test]
+    fn consume_less_than_peeked_leaves_the_remainder_available() {
+        // 0xAB = 1010_1011. Peek all 8 bits, consume only the top 4
+        // (0xA), then the next peek must see the low 4 bits (0xB) still
+        // sitting at the front of the stream.
+        let mut r = BitReaderMsb::new(Cursor::new(vec![0xAB, 0x00]));
+        assert_eq!(r.peek(8).unwrap(), Some(0xAB));
+        r.consume(4);
+        assert_eq!(r.peek(4).unwrap(), Some(0xB));
+    }
+
+    #[test]
+    fn peek_refills_across_a_byte_boundary() {
+        let mut r = BitReaderMsb::new(Cursor::new(vec![0xAB, 0xCD]));
+        r.peek(4).unwrap();
+        r.consume(4); // burn the high nibble so the next peek needs a refill
+        assert_eq!(r.peek(12).unwrap(), Some(0xBCD));
+    }
+
+    #[test]
+    fn peek_past_eof_is_none() {
+        let mut r = BitReaderMsb::new(Cursor::new(vec![0xFF]));
+        assert_eq!(r.peek(16).unwrap(), None);
+    }
+
+    #[test]
+    fn peek_zero_bits_is_zero_without_consuming_anything() {
+        let mut r = BitReaderMsb::new(Cursor::new(vec![0xAB]));
+        assert_eq!(r.peek(0).unwrap(), Some(0));
+        assert_eq!(r.peek(8).unwrap(), Some(0xAB), "peek(0) must not consume");
     }
 }
