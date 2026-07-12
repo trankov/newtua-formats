@@ -259,6 +259,41 @@ fn base_n_body_is_unsupported() {
 }
 
 #[test]
+fn recovery_style_desync_reports_unsupported() {
+    // An attribute type > 10 (here 24, matching the corpus's observed "attrib
+    // type too big: 24") is the signature of a recovery-record/redundancy
+    // element our container doesn't model. Followed immediately by a truncated
+    // stream (no further elements, no `write_end`), this reproduces the desync
+    // 19i targets: the reference logs the same "too big" line and eventually
+    // runs off the end of the file too.
+    let data = archive(|w| {
+        write_header(w, 2, &[(1, 1), (24, 99)], &[]);
+    });
+
+    let err = SitxArchive::open(data)
+        .err()
+        .expect("a desynced, truncated stream must fail");
+    assert_eq!(err.kind(), std::io::ErrorKind::Unsupported);
+    assert!(
+        err.to_string().contains("recovery"),
+        "unexpected error message: {err}"
+    );
+}
+
+#[test]
+fn plain_truncation_without_unknown_fields_stays_unexpected_eof() {
+    // No oversized attribute/algorithm type was ever seen, so a truncated
+    // stream must keep reporting the raw UnexpectedEof — regression guard
+    // against over-eager relabeling of ordinary corrupt/short archives.
+    let data = archive(|_w| {});
+
+    let err = SitxArchive::open(data)
+        .err()
+        .expect("a truncated stream must fail");
+    assert_eq!(err.kind(), std::io::ErrorKind::UnexpectedEof);
+}
+
+#[test]
 fn stored_single_file_round_trips() {
     let content = b"the quick brown fox, stored uncompressed".to_vec();
     let data = archive(|w| {
@@ -706,6 +741,48 @@ fn corpus_files_match_unar() {
     );
 }
 
+/// Recovery-record (mac "recoverability") and redundancy (win) archives (19i).
+/// There's no oracle for these — `unar` itself rejects them too (that's why
+/// `corpus_files_match_unar`, above, skips them via `skipped_unar_cant`) — so
+/// this only checks that `SitxArchive::open` reports `Unsupported` rather than
+/// a raw `UnexpectedEof`. Forward-compatible: filters by filename
+/// (`recoverability`/`redundancy`), so 0 matches in the corpus is a pass, not a
+/// skip — no `unar` dependency here, only the corpus itself.
+#[test]
+fn recovery_and_redundancy_archives_report_unsupported() {
+    let Some(dir) = newtua_testutil::sitx_corpus_dir() else {
+        eprintln!("skipping: NEWTUA_SITX_CORPUS not set");
+        return;
+    };
+
+    let mut checked = 0usize;
+    for entry in std::fs::read_dir(&dir).unwrap() {
+        let path = entry.unwrap().path();
+        if !path.is_file() {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        if !(name.contains("recoverability") || name.contains("redundancy")) {
+            continue;
+        }
+        let bytes = std::fs::read(&path).unwrap();
+        if !SitxArchive::recognize(&bytes) {
+            continue; // e.g. the corpus's .as/.bin/.hqx wrappers around the same fixture
+        }
+
+        let err = SitxArchive::open(bytes)
+            .err()
+            .unwrap_or_else(|| panic!("{name} unexpectedly opened successfully"));
+        assert_eq!(
+            err.kind(),
+            std::io::ErrorKind::Unsupported,
+            "{name}: expected Unsupported, got {err:?}"
+        );
+        checked += 1;
+    }
+    eprintln!("recovery/redundancy corpus: {checked} archives checked");
+}
+
 /// Like `corpus_files_match_unar`, but counts and cross-checks Cyanide
 /// (compression method 1) members specifically, matching the per-codec table
 /// 19a's corpus survey used (`report-19a-sitx-container.md`, "Обзор методов
@@ -918,6 +995,85 @@ fn iron_corpus_members_match_unar() {
 		 {archives_unar_cant} archives unar could not parse"
     );
     assert_eq!(members_mismatched, 0, "Iron output diverged from unar");
+}
+
+/// Like `cyanide_corpus_members_match_unar`, but for the English preprocessor
+/// (`preprocessalgorithm == 0`, 19h). Unlike the other corpus tests, English is
+/// a *preprocessor* layered on top of whatever compression codec the entry
+/// uses, so membership is keyed on `compression_name().contains("+English")`
+/// rather than a codec prefix. The corpus is not known to contain any
+/// English-preprocessed members (real-world `.sitx` archives rarely use it),
+/// so this test is forward-looking: it exercises the full pipeline against any
+/// English members the corpus might gain, and 0 members checked is an expected,
+/// passing outcome today. Only compiled with the `english-dict` feature, since
+/// decoding an English member requires the embedded dictionary.
+#[cfg(feature = "english-dict")]
+#[test]
+fn english_corpus_members_match_unar() {
+    let Some(dir) = newtua_testutil::sitx_corpus_dir() else {
+        eprintln!("skipping: NEWTUA_SITX_CORPUS not set");
+        return;
+    };
+    if !newtua_testutil::unar_installed() {
+        eprintln!("skipping: unar not installed");
+        return;
+    }
+
+    let mut members_checked = 0usize;
+    let mut members_mismatched = 0usize;
+    let mut archives_unar_cant = 0usize;
+    for entry in std::fs::read_dir(&dir).unwrap() {
+        let path = entry.unwrap().path();
+        if !path.is_file() {
+            continue;
+        }
+        let bytes = std::fs::read(&path).unwrap();
+        if !SitxArchive::recognize(&bytes) {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+
+        let arc = match SitxArchive::open(bytes.clone()) {
+            Ok(a) => a,
+            Err(_) => continue, // not an English-relevant failure; the general oracle covers this
+        };
+        let has_english = arc
+            .entries()
+            .iter()
+            .any(|e| e.compression_name().contains("+English"));
+        if !has_english {
+            continue;
+        }
+
+        let Some(theirs) = newtua_testutil::try_unar_extract_all(&bytes, &name) else {
+            archives_unar_cant += 1;
+            continue;
+        };
+
+        for (i, en) in arc.entries().iter().enumerate() {
+            if en.is_directory() || !en.compression_name().contains("+English") {
+                continue;
+            }
+            let mut buf = Vec::new();
+            arc.read_entry(i, &mut buf)
+                .unwrap_or_else(|e| panic!("English member in {name} failed to decode: {e}"));
+            let mut key = String::from_utf8_lossy(en.name()).into_owned();
+            if en.is_resource_fork() {
+                key.push_str("/..namedfork/rsrc");
+            }
+            members_checked += 1;
+            if theirs.get(&key) != Some(&buf) {
+                members_mismatched += 1;
+                eprintln!("english mismatch: {name}:{key}");
+            }
+        }
+    }
+    eprintln!(
+        "english corpus: {members_checked} members checked, {members_mismatched} mismatched, \
+		 {archives_unar_cant} archives unar could not parse (forward-looking: no known English \
+		 fixtures in the corpus today)"
+    );
+    assert_eq!(members_mismatched, 0, "English output diverged from unar");
 }
 
 /// Like `iron_corpus_members_match_unar`, but for Blend (compression method 4,

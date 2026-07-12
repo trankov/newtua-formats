@@ -11,14 +11,17 @@
 //! preprocessor. Stage 19g added **Brimstone** (PPMd variant G, `ppmd/`). Stage
 //! 19c added **Cyanide**, 19d added **Darkhorse**, 19e added **Iron**, and 19f
 //! added **Blend** (a meta-codec dispatching to the other three by marker).
-//! The English preprocessor still parses its parameters but surfaces as
-//! [`io::ErrorKind::Unsupported`].
+//! Stage 19h added the **English** preprocessor (`english.rs`), gated behind
+//! the `english-dict` cargo feature because it embeds a ~414 KB dictionary
+//! asset; without that feature it surfaces as [`io::ErrorKind::Unsupported`].
 
 mod blend;
 mod brimstone;
 mod bwt;
 mod cyanide;
 mod darkhorse;
+#[cfg(feature = "english-dict")]
+mod english;
 mod iron;
 mod p2;
 mod ppmd;
@@ -67,7 +70,16 @@ struct Element {
 /// Read one element header (`ReadElement`, `:32`): a discarded bit, the element
 /// type, the attribute list, then the algorithm list (algorithm 4 carries an
 /// extra crypto parameter). Leaves the reader positioned at the data area.
-fn read_element(r: &mut Reader) -> io::Result<Element> {
+///
+/// `saw_unknown_field` is set (never cleared) when an attribute type is > 10 or
+/// an algorithm-list type is > 6. The reference logs these as "attrib type too
+/// big" / "alglist type too big" — they're the signature of a recovery-record
+/// (mac "recoverability") or redundancy (win) element, whose layout the
+/// reference doesn't model either; the stream desyncs and reads eventually run
+/// off the end. The value is still read and discarded (matching the reference,
+/// which keeps going rather than bailing here) — only the flag lets `parse`
+/// relabel a later `UnexpectedEof` as `Unsupported` instead of a raw truncation.
+fn read_element(r: &mut Reader, saw_unknown_field: &mut bool) -> io::Result<Element> {
     r.bit()?; // discarded "something" bit (only its side effect matters)
     let mut el = Element {
         typ: r.read_p2()?,
@@ -86,6 +98,8 @@ fn read_element(r: &mut Reader) -> io::Result<Element> {
         let value = r.read_p2()?;
         if atype <= 10 {
             el.attribs[(atype - 1) as usize] = value as i64;
+        } else {
+            *saw_unknown_field = true;
         }
     }
 
@@ -97,6 +111,8 @@ fn read_element(r: &mut Reader) -> io::Result<Element> {
         let value = r.read_p2()?;
         if altype <= 6 {
             el.alglist[(altype - 1) as usize] = value as i64;
+        } else {
+            *saw_unknown_field = true;
         }
         if altype == 4 {
             r.read_p2()?; // crypto's extra parameter, read but currently unused
@@ -236,9 +252,16 @@ fn decode_stream(data: &[u8], desc: &StreamDescriptor, want_checksum: bool) -> i
     let preprocessed = match desc.preprocess {
         -1 => decompressed,
         0 => {
-            return Err(unsupported(
-                "sitx: English preprocessor is not yet supported",
-            ))
+            #[cfg(feature = "english-dict")]
+            {
+                english::decode(&decompressed, size)?
+            }
+            #[cfg(not(feature = "english-dict"))]
+            {
+                return Err(unsupported(
+                    "sitx: English preprocessor requires the `english-dict` feature",
+                ));
+            }
         }
         2 => x86::decode(&decompressed, size),
         other => return Err(unsupported(format!("sitx: unknown preprocessor {other}"))),
@@ -528,18 +551,47 @@ fn parse(data: &[u8]) -> io::Result<Vec<SitxEntry>> {
         output: Vec::new(),
     };
 
+    // Recovery-record (mac "recoverability") and redundancy (win) elements use a
+    // layout the reference doesn't model either: `read_element` desyncs on them
+    // (an attribute/algorithm type outside the known range) and the parse
+    // eventually runs off the end of the stream. Relabel that specific
+    // UnexpectedEof as Unsupported so it reads as "format not supported" rather
+    // than "corrupt archive" — but only when we've actually seen that signature,
+    // so a genuinely truncated ordinary archive still reports UnexpectedEof.
+    let mut saw_unknown_element_field = false;
+    if let Err(e) = parse_elements(data, &mut r, &mut p, &mut saw_unknown_element_field) {
+        if e.kind() == io::ErrorKind::UnexpectedEof && saw_unknown_element_field {
+            return Err(unsupported(
+                "sitx: recovery-record / redundancy archives are not supported",
+            ));
+        }
+        return Err(e);
+    }
+
+    Ok(p.output)
+}
+
+/// The element-parsing loop (`-parse`'s main `while` body, `:288-...`), factored
+/// out of [`parse`] so a resulting `UnexpectedEof` can be inspected — and
+/// potentially relabeled — before it leaves `parse`.
+fn parse_elements(
+    data: &[u8],
+    r: &mut Reader,
+    p: &mut Parser,
+    saw_unknown_element_field: &mut bool,
+) -> io::Result<()> {
     loop {
-        let mut el = read_element(&mut r)?;
+        let mut el = read_element(r, saw_unknown_element_field)?;
         match el.typ {
             0 => break, // end
-            1 => handle_data(&mut p, &mut r, &mut el)?,
+            1 => handle_data(p, r, &mut el)?,
             2 => {
                 let (id, parent) = (el.attribs[0], el.attribs[1]);
                 let idx = p.entries.len();
                 p.entries.push(EntryBuilder::new(id, parent, false));
                 p.entrydict.insert(id, idx);
             }
-            3 => handle_fork(&mut p, &mut r, &el)?,
+            3 => handle_fork(p, r, &el)?,
             4 => {
                 let (id, parent) = (el.attribs[0], el.attribs[1]);
                 let idx = p.entries.len();
@@ -547,11 +599,11 @@ fn parse(data: &[u8]) -> io::Result<Vec<SitxEntry>> {
                 p.entrydict.insert(id, idx);
             }
             5 => {
-                scan_element_data(&mut r, &mut el)?;
+                scan_element_data(r, &mut el)?;
                 el.actualsize = el.attribs[4].max(0) as u64;
                 let pos = r.offset();
                 let catalog = decode_stream(data, &StreamDescriptor::from_element(&el), false)?;
-                parse_catalog(&catalog, &mut p)?;
+                parse_catalog(&catalog, p)?;
                 r.seek(pos);
             }
             6 => {
@@ -564,7 +616,7 @@ fn parse(data: &[u8]) -> io::Result<Vec<SitxEntry>> {
             8 | 9 => {}
             _ => {
                 if el.typ > 10 {
-                    scan_element_data(&mut r, &mut el)?;
+                    scan_element_data(r, &mut el)?;
                 } else {
                     return Err(unsupported(format!(
                         "sitx: unsupported element type {}",
@@ -576,7 +628,7 @@ fn parse(data: &[u8]) -> io::Result<Vec<SitxEntry>> {
         r.flush();
     }
 
-    Ok(p.output)
+    Ok(())
 }
 
 /// Insert a fork element into its stream (`case 3`, `:470`). Forks may arrive out
