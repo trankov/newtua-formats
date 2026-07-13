@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Custom NSIS bzip2 decoder.
 //!
 //! A faithful port of `XADNSISBzip2Handle.m` — Rob Landley's micro-bunzip

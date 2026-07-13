@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! PPMd's Brimstone sub-allocator (`PPMd/SubAllocator.h` + `SubAllocatorBrimstone.c`).
 //!
 //! A free-list arena allocator with no defragmentation or block coalescing

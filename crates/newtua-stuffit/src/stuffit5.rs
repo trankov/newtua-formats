@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Classic StuffIt compression method 5 (LZAH — dynamic LZH).
 //!
 //! Faithful port of XADMaster's active `XADLZHDynamicHandle`. An LZSS coder with

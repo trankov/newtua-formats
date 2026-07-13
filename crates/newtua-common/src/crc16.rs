@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! CRC-16 variants used by the legacy formats.
 //!
 //! - CRC-16/ARC — reflected polynomial `0x8005` (`0xA001`), initial value 0, no

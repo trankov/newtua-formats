@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! ARJ (`.arj`) — Robert Jung's MS-DOS archiver.
 //!
 //! An ARJ archive is a main header followed by a flat sequence of local

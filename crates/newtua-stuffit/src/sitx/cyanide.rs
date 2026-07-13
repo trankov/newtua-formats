@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! StuffItX Cyanide codec (`XADStuffItXCyanideHandle`), compression method 1.
 //!
 //! A ternary adaptive range coder over three Markov context groups, escaping into

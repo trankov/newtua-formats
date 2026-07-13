@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Low-level StuffItX stream reading: an LSB-first bit reader over an in-memory
 //! slice, the P2 variable-length integer, and the block-stream unwrapper.
 //!

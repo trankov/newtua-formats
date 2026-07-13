@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! End-to-end oracle for the Zoo container and its LZH-static codec.
 //!
 //! No common tool writes `.zoo`, so this test assembles archives from a small

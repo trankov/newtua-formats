@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! End-to-end oracle for the ARJ container and its codecs (LZH-static methods
 //! 1/2/3 and the "Fastest" method 4 LZSS).
 //!

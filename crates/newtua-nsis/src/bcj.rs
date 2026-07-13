@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! 7-Zip x86 BCJ branch filter.
 //!
 //! A faithful port of `x86_Convert` from `lzma/Bra86.c` (Igor Pavlov, public

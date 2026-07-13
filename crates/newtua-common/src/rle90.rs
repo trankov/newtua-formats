@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! RLE90 run-length decoding.
 //!
 //! The `0x90` byte is a repeat marker: `b 0x90 n` expands to `b` repeated `n`

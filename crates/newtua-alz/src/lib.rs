@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! ALZip (`.alz`) — a flat multi-file container from the Korean ALZip tool.
 //!
 //! After an 8-byte file header (`A L Z 0x01 … 0x00`) comes a stream of records.

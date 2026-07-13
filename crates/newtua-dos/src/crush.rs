@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! ARC "Crush" (method 0xa) — an adaptive LZW with usage-based code replacement
 //! and a switchable literal-bit coding mode.
 //!

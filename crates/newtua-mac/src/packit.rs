@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! PackIt (`.pit`) — an early flat Macintosh archive: a stream of records, one
 //! per file (up to two forks each), terminated by a `PEnd` marker.
 //!

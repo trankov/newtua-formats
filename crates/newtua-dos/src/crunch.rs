@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! ARC "Crunch" (methods 5/6/7) — a fixed 12-bit LZW with a hash-coded string
 //! table.
 //!

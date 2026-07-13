@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! PPMd's own range coder (`PPMd/RangeCoder.h`/`.c`).
 //!
 //! Structurally similar to `sitx::rangecoder::RangeCoder` (`CarrylessRangeCoder`,

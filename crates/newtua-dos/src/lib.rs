@@ -1,6 +1,9 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Decoders for DOS / CP-M era archive formats.
 //!
-//! Pure-Rust ports of legacy formats (LGPL-2.1). Each format is a
+//! Pure-Rust ports of legacy formats (LGPL-3.0-or-later). Each format is a
 //! container parser plus its compression methods, built on the shared
 //! primitives in [`newtua_common`].
 //!

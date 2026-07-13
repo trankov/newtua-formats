@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! End-to-end oracle for the PackIt container and its StuffIt-Huffman + XOR +
 //! DES codecs.
 //!

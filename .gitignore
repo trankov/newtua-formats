@@ -2,3 +2,5 @@
 **/*.rs.bk
 Cargo.lock
 .DS_Store
+tasks_n_reports/
+*_old.*

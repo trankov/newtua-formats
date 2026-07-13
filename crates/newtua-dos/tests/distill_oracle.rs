@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! End-to-end oracle for ARC method 0x0b (Distilled).
 //!
 //! There is no committed `.arc` fixture for Distilled because no common tool

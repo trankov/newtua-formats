@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! LBR (`.lbr`) — the CP/M library container.
 //!
 //! An LBR has no compression of its own: it is a flat directory of members,

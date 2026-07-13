@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Carryless (Subbotin-style) range decoder for the StuffItX range-coded
 //! codecs (Cyanide / Darkhorse / Iron).
 //!

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Test-only symmetric encoder for PPMd variant G / Brimstone.
 //!
 //! There's no PPMd encoder anywhere in XADMaster (the project only ever

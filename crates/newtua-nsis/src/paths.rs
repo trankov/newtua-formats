@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Filename/path expansion for NSIS sectioned headers.
 //!
 //! NSIS stores paths in a string table with embedded variable markers. This is

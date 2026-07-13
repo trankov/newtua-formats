@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Generic LZW decoder — a prefix tree of `code → (parent code, byte)`.
 //!
 //! Faithful port of XADMaster's `LZW.c`. This is the generic engine that Zoo's

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Amiga LZX archive container.
 //!
 //! Faithful port of XADMaster's `XADLZXParser.m` container logic. An LZX

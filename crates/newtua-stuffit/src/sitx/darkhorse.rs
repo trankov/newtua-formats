@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! StuffItX Darkhorse codec (`XADStuffItXDarkhorseHandle`), compression method 2.
 //!
 //! A windowed LZSS coder where every decision (literal/match flag, literal

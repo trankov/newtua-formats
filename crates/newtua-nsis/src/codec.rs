@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Codec detection and decoding for NSIS payload streams.
 //!
 //! NSIS sniffs the compression method from the first bytes of the data area

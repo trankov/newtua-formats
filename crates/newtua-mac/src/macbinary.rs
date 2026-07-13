@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! MacBinary I / II / III — a 128-byte header carrying one Mac file's two forks.
 //!
 //! A MacBinary file is a flat container: a fixed 128-byte header, then the data

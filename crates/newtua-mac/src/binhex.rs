@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! BinHex 4.0 (`.hqx`) — the classic Macintosh ASCII transport encoding.
 //!
 //! A BinHex file is an ASCII envelope around the two forks (data + resource) of

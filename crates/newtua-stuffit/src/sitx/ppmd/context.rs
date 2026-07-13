@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! PPMd's common model core (`PPMd/Context.h`/`.c`), shared by every PPMd
 //! variant (only variant G is ported at this stage).
 //!

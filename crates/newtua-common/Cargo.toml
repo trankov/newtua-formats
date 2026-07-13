@@ -1,6 +1,6 @@
 [package]
 name = "newtua-common"
-version = "0.0.0"
+version = "0.1.0"
 description = "Shared low-level primitives (bit readers, prefix/Huffman codes, LZSS window, deflate, RLE90, CRC, MD5, RC4, ZipCrypto) for the newtua-formats family of legacy archive-format decoders."
 edition.workspace = true
 rust-version.workspace = true

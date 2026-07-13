@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! End-to-end golden tests for the DMS container: a small mirror encoder
 //! builds valid `.dms` disk images (NOCOMP + SIMPLE + QUICK + MEDIUM tracks,
 //! plus text tracks), which are checked against both our own parser and the

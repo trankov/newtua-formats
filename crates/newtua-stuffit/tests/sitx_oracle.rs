@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! StuffItX container tests: a mirror encoder that builds valid `.sitx` archives
 //! for round-trips through [`SitxArchive`], plus the `unar` oracle over both our
 //! own fixtures and a real corpus (`NEWTUA_SITX_CORPUS`).

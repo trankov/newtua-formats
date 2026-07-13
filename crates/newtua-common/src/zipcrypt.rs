@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Traditional PKWARE ZipCrypto stream cipher.
 //!
 //! The classic ZIP encryption, reused by ALZip for its encrypted members. Three

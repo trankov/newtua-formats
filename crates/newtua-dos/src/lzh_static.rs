@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! LZH-static decoder — the shared LZSS-plus-static-Huffman codec used by both
 //! Zoo (method 2, 13-bit window) and ARJ (methods 1/2/3, 15-bit window).
 //!

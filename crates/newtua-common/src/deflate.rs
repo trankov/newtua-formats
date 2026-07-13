@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! DEFLATE (RFC 1951) inflate, with a parameterisable meta-table order.
 //!
 //! A faithful port of XADMaster's `XADDeflateHandle` (the Normal variant; the

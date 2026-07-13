@@ -1,6 +1,6 @@
 [package]
 name = "newtua-amiga"
-version = "0.0.0"
+version = "0.1.0"
 description = "Decoders for Amiga compression formats: PowerPacker, Amiga LZX, and DMS."
 edition.workspace = true
 rust-version.workspace = true

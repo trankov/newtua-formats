@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Shared low-level primitives for the `newtua-formats` family of legacy
 //! archive-format decoders.
 //!

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! StuffIt 5 (`.sit`) — the 1997 container that superseded classic StuffIt.
 //!
 //! Unlike the flat classic format, StuffIt 5 stores a real directory tree: each

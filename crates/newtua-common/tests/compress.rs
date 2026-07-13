@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Integration test for [`CompressReader`] over a stream long enough to grow
 //! the code width past 9 bits.
 //!

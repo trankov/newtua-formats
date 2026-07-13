@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Prefix (Huffman) code trees.
 //!
 //! A [`PrefixCode`] is a binary tree whose leaves carry symbol values. It is

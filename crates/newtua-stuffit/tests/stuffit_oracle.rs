@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! End-to-end oracle for the classic StuffIt container and its store / RLE90 /
 //! Unix-compress / StuffIt-Huffman codecs.
 //!

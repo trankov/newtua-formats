@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! DES (Data Encryption Standard) in ECB mode — the cipher PackIt's `PMa6`
 //! records are encrypted with.
 //!

@@ -1,6 +1,6 @@
 [package]
 name = "newtua-nsis"
-version = "0.0.0"
+version = "0.1.0"
 description = "Decoder for NSIS (Nullsoft installer) archives."
 edition.workspace = true
 rust-version.workspace = true

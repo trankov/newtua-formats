@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Unit tests for the NSIS container, plus a synthetic-installer builder that
 //! doubles as the mirror-encoder oracle (build an installer our own encoder
 //! produces, then decode it back). The `unar` cross-check lives in

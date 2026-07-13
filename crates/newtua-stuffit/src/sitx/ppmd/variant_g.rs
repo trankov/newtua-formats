@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! PPMd model variant G (`PPMd/VariantG.h`/`.c`), used (with `brimstone=true`)
 //! by StuffItX's Brimstone codec. The `brimstone` flag affects exactly three
 //! things, all in [`restart_model`] and the range coder's `bottom`

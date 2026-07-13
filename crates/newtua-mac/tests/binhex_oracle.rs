@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! End-to-end oracle for the BinHex 4.0 container and its three-layer codec
 //! (hqx 6->8, then RLE90).
 //!

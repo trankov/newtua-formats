@@ -1,6 +1,9 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Decoders for the StuffIt family of classic Macintosh archives.
 //!
-//! Pure-Rust ports of the StuffIt formats (LGPL-2.1), built on the shared
+//! Pure-Rust ports of the StuffIt formats (LGPL-3.0-or-later), built on the shared
 //! primitives in [`newtua_common`]. This crate covers the **classic** StuffIt
 //! container ([`stuffit`], signature `SIT!` + `rLau`), the **StuffIt 5**
 //! container ([`sit5`], the 1997 banner format, including its self-extracting

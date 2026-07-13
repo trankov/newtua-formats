@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Classic StuffIt (`.sit`) — a flat Macintosh archive of files with two forks.
 //!
 //! The archive is a 22-byte header (`SIT!` signature plus a total-size field)

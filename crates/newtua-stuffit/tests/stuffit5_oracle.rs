@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! End-to-end oracle for classic StuffIt compression method 5 (LZAH).
 //!
 //! As for the other StuffIt codecs, no common tool *writes* classic `.sit`, so

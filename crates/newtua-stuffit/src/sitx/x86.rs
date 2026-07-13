@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! StuffItX x86 branch preprocessor (`XADStuffItXX86Handle`).
 //!
 //! An inverse E8/E9 (near `call`/`jmp`) filter: the archive stores branch targets

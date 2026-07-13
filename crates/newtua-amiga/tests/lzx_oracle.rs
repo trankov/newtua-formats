@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! End-to-end golden test: assemble a store-method (method 0) LZX archive with
 //! a small mirror encoder, then check both our own parser AND the reference
 //! `unar`/`lsar` agree on entry names/count and on the extracted bytes.

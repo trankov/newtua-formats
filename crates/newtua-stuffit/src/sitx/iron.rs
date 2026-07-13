@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! StuffItX Iron codec (`XADStuffItXIronHandle`), compression method 6.
 //!
 //! A block codec: the stream is split into blocks, each block holding either raw

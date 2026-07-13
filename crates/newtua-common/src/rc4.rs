@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! RC4 stream cipher (Rivest Cipher 4).
 //!
 //! A tiny symmetric stream cipher: a 256-byte permutation state keyed by the

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! ARC (SEA ARC / PKARC) — a flat-or-nested multi-file container.
 //!
 //! Each member is `0x1A`, a method byte, a 13-byte name, then sizes, an MS-DOS

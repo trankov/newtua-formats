@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Fixed-width little-endian integer reads from a byte source.
 //!
 //! Shared by the container parsers. These use `read_exact`, so a short read is

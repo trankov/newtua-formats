@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Cross-check oracle: build real NSIS installers with `makensis` and verify our
 //! extraction matches `unar` (XADMaster) byte-for-byte — both the entry paths
 //! (including NSIS 3's quirky unexpanded `$INSTDIR` marker, a literal `U+0003`

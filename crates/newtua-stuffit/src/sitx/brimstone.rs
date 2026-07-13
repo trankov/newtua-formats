@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! StuffItX Brimstone codec (`XADStuffItXBrimstoneHandle`), compression
 //! method 0: PPMd variant G with `brimstone=true` and its own free-list
 //! sub-allocator (`ppmd::alloc`). A faithful port of

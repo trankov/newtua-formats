@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! LZSS sliding window.
 //!
 //! A power-of-two ring buffer that reconstructs LZSS output: literals are

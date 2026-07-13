@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! ARC "Distilled" (method 0x0b) — LZSS with a header-supplied Huffman code.
 //!
 //! Unlike the other ARC methods this one is not LZW. The compressed stream

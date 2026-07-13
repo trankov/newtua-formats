@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! End-to-end oracle for the StuffIt 5 container.
 //!
 //! No common tool *writes* StuffIt 5, so — as for the classic StuffIt codecs —

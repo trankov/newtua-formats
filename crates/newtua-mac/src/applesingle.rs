@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! AppleSingle and AppleDouble — fork containers with an entry table.
 //!
 //! Both formats share one structure: a header (magic + version + 16-byte

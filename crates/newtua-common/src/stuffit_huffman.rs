@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! StuffIt Huffman decoder — the compression used inside PackIt's `PMa4/5/6`
 //! records and classic StuffIt's method 3.
 //!

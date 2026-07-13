@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Zoo (`.zoo`) — the cross-platform Zoo archiver container.
 //!
 //! A Zoo archive is a header followed by a singly-linked list of directory

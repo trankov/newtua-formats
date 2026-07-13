@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! StuffItX (`.sitx`) archive support.
 //!
 //! A pure-Rust port of XADMaster's `XADStuffItXParser` and its low-level

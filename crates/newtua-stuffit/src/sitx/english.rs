@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! StuffItX English preprocessor (`XADStuffItXEnglishHandle`), applied last in
 //! the chain after the compression codec runs (`preprocessalgorithm == 0`,
 //! `XADStuffItXParser.m:179-181`). It is a word-substitution de-escaper for

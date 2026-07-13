@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Classic StuffIt compression method 13 (LZ + Huffman).
 //!
 //! Faithful port of XADMaster's `XADStuffIt13Handle`. An LZSS coder with a

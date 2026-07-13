@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! CRC-32/IEEE (the "conditioned" variant used by zip and ALZip).
 //!
 //! Reflected polynomial `0xEDB88320`, initial value `0xFFFFFFFF`, final XOR

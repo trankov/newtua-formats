@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! End-to-end oracle for classic StuffIt compression method 15 (Arsenic).
 //!
 //! No common tool *writes* classic `.sit`, so — as for the other StuffIt codecs

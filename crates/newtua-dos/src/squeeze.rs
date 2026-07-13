@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Squeeze (`.SQ`) — CP/M-era single-file Huffman compressor.
 //!
 //! File layout:

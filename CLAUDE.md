@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 `newtua-formats` — pure-Rust decoders for **legacy archive formats that have no mature
-Rust crate yet**, ported from The Unarchiver's **XADMaster** engine (LGPL-2.1).
+Rust crate yet**, ported from The Unarchiver's **XADMaster** engine (LGPL).
 Built to plug into the `newtua` extractor (`../newtheunarchiver`), but each crate
 is usable standalone by the wider community.
 
@@ -16,8 +16,8 @@ is usable standalone by the wider community.
   codecs, with **no runtime dependency** on third-party codec libraries. A
   reference `unar` build (from XADMaster) is used **only as a test oracle** for
   cross-checking correctness, never as a dependency.
-- License is **LGPL-2.1-or-later**, matching XADMaster — so code may be ported
-  directly (1:1) from XADMaster.
+- License is **LGPL-3.0-or-later**. XADMaster is LGPL, so its algorithms may be
+  ported directly (1:1); as a derivative work these crates stay under the LGPL.
 
 ## Architecture
 

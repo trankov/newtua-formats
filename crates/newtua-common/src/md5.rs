@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! MD5 message-digest (RFC 1321).
 //!
 //! A one-shot [`md5`] over a byte slice, returning the 16-byte digest. StuffIt 5

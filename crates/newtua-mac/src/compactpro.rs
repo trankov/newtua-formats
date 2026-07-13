@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Compact Pro (`.cpt`) — a classic Macintosh archive of files with two forks.
 //!
 //! A Compact Pro file is a flat 8-byte header pointing at a catalog near the end

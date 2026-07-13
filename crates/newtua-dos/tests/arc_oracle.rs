@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! End-to-end golden tests: extract a multi-member `.arc` with our crate AND
 //! with the reference `unar`, and assert every member agrees byte-for-byte.
 //!

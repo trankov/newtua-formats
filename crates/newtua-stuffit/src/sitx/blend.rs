@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! StuffItX Blend codec (`XADStuffItXBlendHandle`), compression method 4.
 //!
 //! A meta-codec: the uncompressed stream is sliced into sub-blocks, each

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! End-to-end oracle for the CP/M Crunch LZHUF codec (type `0xfd`, "CrLZH").
 //!
 //! `unar` only *decodes* Crunch, so each test builds a valid LZHUF stream with a

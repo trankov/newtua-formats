@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Aleksei Trankov and contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 //! Amiga DMS (DiskMasher) disk-image archive.
 //!
 //! Faithful port of XADMaster's `libxad/clients/DMS.c` container logic. DMS

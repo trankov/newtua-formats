@@ -1,5 +1,5 @@
 # Workspace for the newtua-formats family of legacy archive-format decoders.
-# Pure-Rust decoders for legacy archive formats (LGPL-2.1).
+# Pure-Rust decoders for legacy archive formats (LGPL-3.0-or-later).
 [workspace]
 resolver = "2"
 members = [
@@ -16,13 +16,13 @@ members = [
 [workspace.package]
 edition = "2021"
 rust-version = "1.74"
-license = "LGPL-2.1-or-later"
+license = "LGPL-3.0-or-later"
 repository = "https://github.com/trankov/newtua-formats"
 categories = ["compression", "parser-implementations"]
 keywords = ["archive", "decompression", "retro", "legacy"]
 
 [workspace.dependencies]
-newtua-common = { path = "crates/newtua-common", version = "0.0.0" }
+newtua-common = { path = "crates/newtua-common", version = "0.1.0" }
 newtua-testutil = { path = "crates/newtua-testutil" }
 
 # Keep line tables (so panics and test failures still point at a source line)
