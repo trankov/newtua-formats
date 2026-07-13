@@ -1,0 +1,16 @@
+newtua-formats — pure-Rust decoders for legacy archive formats.
+Copyright (C) 2026 Aleksei Trankov and contributors.
+
+Licensed under the GNU Lesser General Public License, version 3 or (at your
+option) any later version. The full license text is in LICENSE (the GNU Lesser
+General Public License v3); it incorporates by reference the GNU General Public
+License v3, provided in GPL-3.0.txt. If you did not receive these, see
+<https://www.gnu.org/licenses/>.
+
+Provenance: this work is a derivative of XADMaster (The Unarchiver), from which
+the decompression algorithms are ported. XADMaster is © Dag Ågren and
+contributors and is distributed under the GNU LGPL. As a derivative work, these
+crates remain under the LGPL — see the "Provenance & license" section of the
+README for the full story.
+
+SPDX-License-Identifier: LGPL-3.0-or-later

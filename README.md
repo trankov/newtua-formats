@@ -2,7 +2,7 @@
 
 > Pure-Rust decoders for the legacy archive formats the modern ecosystem forgot.
 
-[![License: LGPL v3](https://img.shields.io/badge/License-LGPLv3-blue.svg)](COPYING.LESSER)
+[![License: LGPL v3](https://img.shields.io/badge/License-LGPLv3-blue.svg)](LICENSE)
 [![MSRV](https://img.shields.io/badge/rustc-1.74+-orange.svg)](#requirements)
 [![Made for retro & preservation](https://img.shields.io/badge/for-digital%20preservation-8a2be2.svg)](#why-this-exists)
 
@@ -171,8 +171,8 @@ The whole project is test-driven, so every format ships with the tests that prov
 
 The decompression algorithms are ported from **XADMaster** (The Unarchiver), by Dag Ågren and contributors. Dag built the whole engine under the **LGPL** from the start, and parts of it descend from even older LGPL code that can never be relicensed. A faithful port of that work is a derivative work, so it inherits the license — there's no legitimate way to slip it under MIT or Apache. We don't fight that; we embrace it. Keeping these decoders under the LGPL is also what keeps them *free software for good*, which is exactly the spirit of the original.
 
-- Full texts: [`COPYING`](COPYING) (GPL-3.0) and [`COPYING.LESSER`](COPYING.LESSER) (LGPL-3.0).
-- Short notice and provenance: [`LICENSE`](LICENSE).
+- Full text: [`LICENSE`](LICENSE) (the GNU LGPL v3), which incorporates the GNU GPL v3 provided in [`GPL-3.0.txt`](GPL-3.0.txt).
+- Copyright and provenance: [`NOTICE`](NOTICE).
 
 In plain terms: the library stays free software forever, but — thanks to the *Lesser* GPL — you can still use it inside a program under a license of your own choosing.
 

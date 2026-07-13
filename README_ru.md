@@ -2,7 +2,7 @@
 
 > Декодеры на чистом Rust для устаревших форматов архивов, о которых забыла современная экосистема.
 
-[![License: LGPL v3](https://img.shields.io/badge/License-LGPLv3-blue.svg)](COPYING.LESSER)
+[![License: LGPL v3](https://img.shields.io/badge/License-LGPLv3-blue.svg)](LICENSE)
 [![MSRV](https://img.shields.io/badge/rustc-1.74+-orange.svg)](#требования)
 [![Made for retro & preservation](https://img.shields.io/badge/for-digital%20preservation-8a2be2.svg)](#зачем-это-нужно)
 
@@ -171,8 +171,8 @@ fn main() -> std::io::Result<()> {
 
 Алгоритмы распаковки портированы из **XADMaster** (The Unarchiver) авторства Dag Ågren и участников. Даг с самого начала строил весь движок под **LGPL**, а часть кода восходит к ещё более старому LGPL-коду, который перелицензировать нельзя никогда. Добросовестный порт такой работы — это производная работа, поэтому он наследует лицензию: законного способа перевести его под MIT или Apache не существует. Мы с этим не боремся — мы это принимаем. К тому же именно LGPL сохраняет эти декодеры *свободным ПО навсегда*, а это ровно дух оригинала.
 
-- Полные тексты: [`COPYING`](COPYING) (GPL-3.0) и [`COPYING.LESSER`](COPYING.LESSER) (LGPL-3.0).
-- Короткое уведомление и происхождение: [`LICENSE`](LICENSE).
+- Полный текст: [`LICENSE`](LICENSE) (GNU LGPL v3), который включает по ссылке GNU GPL v3 из файла [`GPL-3.0.txt`](GPL-3.0.txt).
+- Копирайт и происхождение: [`NOTICE`](NOTICE).
 
 Проще говоря: библиотека остаётся свободным ПО навсегда, но — благодаря *Lesser* GPL — вы всё равно можете использовать её внутри программы под лицензией на ваш выбор.
 
