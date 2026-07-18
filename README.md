@@ -32,7 +32,7 @@ So we went to the source. The Unarchiver's engine, **XADMaster**, was written in
 
 ## Part of New The Unarchiver
 
-These crates are one layer of **New The Unarchiver** — a ground-up, cross-platform Rust reincarnation of The Unarchiver. Where the original was a macOS app, New The Unarchiver aims to run everywhere and adds a cross-platform command line, an inline terminal UI, fully in-process extraction (no bundled `unrar`/`7z`/`tar` binaries to shell out to), selective extraction by glob, and localizable messages — all while reading the same archive formats users relied on the original for. `newtua-formats` is the piece of that engine responsible for the *legacy* formats. We carved it out and published it on its own because a good pure-Rust decoder for a forgotten format is useful far beyond one app — and giving it back is the point.
+These crates are one layer of **[New The Unarchiver](https://github.com/new-the-unarchiver)** — a ground-up, cross-platform Rust reincarnation of The Unarchiver. Where the original was a macOS app, New The Unarchiver aims to run everywhere and adds a cross-platform command line, an inline terminal UI, fully in-process extraction (no bundled `unrar`/`7z`/`tar` binaries to shell out to), selective extraction by glob, and localizable messages — all while reading the same archive formats users relied on the original for. `newtua-formats` is the piece of that engine responsible for the *legacy* formats. We carved it out and published it on its own because a good pure-Rust decoder for a forgotten format is useful far beyond one app — and giving it back is the point.
 
 ## Supported formats
 
