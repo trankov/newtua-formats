@@ -14,7 +14,7 @@ Somewhere on an old hard drive there is a `.sit` from a 1996 Mac, a `.dms` disk 
 
 `newtua-formats` does. It is a family of small, self-contained crates that decode **exactly the formats missing from the Rust ecosystem** — no more, no less — with the decompression algorithms carefully ported from [The Unarchiver](https://theunarchiver.com/)'s battle-tested **XADMaster** engine and cross-checked against it for correctness.
 
-It's built as the archive backend for a larger project, **NewTheUnarchiver**, but every crate stands on its own and is offered as a gift to the wider Rust and digital-preservation communities.
+It's built as the archive backend for a larger project, **New The Unarchiver**, but every crate stands on its own and is offered as a gift to the wider Rust and digital-preservation communities.
 
 ## Why this exists
 
@@ -30,9 +30,9 @@ So we went to the source. The Unarchiver's engine, **XADMaster**, was written in
 
 `newtua-formats` is the result: the legacy-format layer, pulled out into standalone crates so the whole community can use it, not just our own extractor.
 
-## Part of NewTheUnarchiver
+## Part of New The Unarchiver
 
-These crates are one layer of **NewTheUnarchiver** — a ground-up, cross-platform Rust reincarnation of The Unarchiver. Where the original was a macOS app, NewTheUnarchiver aims to run everywhere and adds a cross-platform command line, an inline terminal UI, fully in-process extraction (no bundled `unrar`/`7z`/`tar` binaries to shell out to), selective extraction by glob, and localizable messages — all while reading the same archive formats users relied on the original for. `newtua-formats` is the piece of that engine responsible for the *legacy* formats. We carved it out and published it on its own because a good pure-Rust decoder for a forgotten format is useful far beyond one app — and giving it back is the point.
+These crates are one layer of **New The Unarchiver** — a ground-up, cross-platform Rust reincarnation of The Unarchiver. Where the original was a macOS app, New The Unarchiver aims to run everywhere and adds a cross-platform command line, an inline terminal UI, fully in-process extraction (no bundled `unrar`/`7z`/`tar` binaries to shell out to), selective extraction by glob, and localizable messages — all while reading the same archive formats users relied on the original for. `newtua-formats` is the piece of that engine responsible for the *legacy* formats. We carved it out and published it on its own because a good pure-Rust decoder for a forgotten format is useful far beyond one app — and giving it back is the point.
 
 ## Supported formats
 
@@ -178,4 +178,4 @@ In plain terms: the library stays free software forever, but — thanks to the *
 
 ## Status
 
-The formats above are implemented and tested. A handful of rarer variants remain on the backlog; implementation order is tracked in the companion NewTheUnarchiver project. Contributions and bug reports for the supported formats are welcome.
+The formats above are implemented and tested. A handful of rarer variants remain on the backlog; implementation order is tracked in the companion New The Unarchiver project. Contributions and bug reports for the supported formats are welcome.
