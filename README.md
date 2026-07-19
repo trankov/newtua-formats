@@ -1,3 +1,5 @@
+**English** · [Русский](README_ru.md)
+
 # newtua-formats
 
 > Pure-Rust decoders for the legacy archive formats the modern ecosystem forgot.
